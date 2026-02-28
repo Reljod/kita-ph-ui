@@ -9,14 +9,7 @@ import {
 import { api } from '@/lib/api';
 import { Agent, Message } from '@/store/useAgentStore';
 
-const BUILDER_AGENT: Agent = {
-    id: 'builder_0',
-    name: 'Agent Builder',
-    role: 'Creator & Orchestrator',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=builder&backgroundColor=4f46e5',
-    color: 'bg-indigo-600',
-    messages: []
-};
+const CREATOR_AGENT_ID = 'agent-creator';
 
 export default function UnifiedWorkspace() {
     // Query to fetch agents from Kita API
@@ -40,9 +33,14 @@ export default function UnifiedWorkspace() {
     // Initialization
     useEffect(() => {
         if (fetchedAgents) {
-            // Re-initialize local state with fetched agents plus the Builder
-            // eslint-disable-next-line
-            setAgents([BUILDER_AGENT, ...fetchedAgents]);
+            // Map fetched agents to UI structure ensuring avatar and color exist
+            const mappedAgents: Agent[] = fetchedAgents.map((a: any) => ({
+                ...a,
+                avatar: a.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${a.id}&backgroundColor=${a.id === CREATOR_AGENT_ID ? '4f46e5' : '2563eb'}`,
+                color: a.color || (a.id === CREATOR_AGENT_ID ? 'bg-indigo-600' : 'bg-blue-600'),
+                messages: a.messages || []
+            }));
+            setAgents(mappedAgents);
         }
     }, [fetchedAgents]);
 
@@ -104,7 +102,7 @@ export default function UnifiedWorkspace() {
 
     const handleDelete = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (id === BUILDER_AGENT.id) return; // Cannot delete builder
+        if (id === CREATOR_AGENT_ID) return; // Cannot delete agent creator
         setAgents(prev => prev.filter(a => a.id !== id));
         setOpenMenuId(null);
         if (selectedAgentId === id) setSelectedAgentId(null);
@@ -116,10 +114,10 @@ export default function UnifiedWorkspace() {
 
         let targetAgentId = selectedAgentId;
 
-        // If we're in Builder Hero mode, we implicitly chat with the Builder
+        // If we're in Builder Hero mode, we implicitly chat with the Creator
         if (isBuilderHeroMode) {
-            targetAgentId = BUILDER_AGENT.id;
-            setSelectedAgentId(BUILDER_AGENT.id);
+            targetAgentId = CREATOR_AGENT_ID;
+            setSelectedAgentId(CREATOR_AGENT_ID);
         }
 
         if (!targetAgentId) return;
@@ -136,7 +134,7 @@ export default function UnifiedWorkspace() {
         setInputValue('');
 
         // Check if target is builder
-        if (targetAgentId === BUILDER_AGENT.id) {
+        if (targetAgentId === CREATOR_AGENT_ID) {
             simulateBuilderProcess(newMsg.content);
         } else {
             simulateAgentReply(targetAgentId, newMsg.content);
@@ -174,7 +172,7 @@ export default function UnifiedWorkspace() {
             };
 
             setAgents(prev => prev.map(a =>
-                a.id === BUILDER_AGENT.id ? { ...a, messages: [...a.messages, builderReply] } : a
+                a.id === CREATOR_AGENT_ID ? { ...a, messages: [...a.messages, builderReply] } : a
             ));
 
             startPollingSimulation();
@@ -210,7 +208,7 @@ export default function UnifiedWorkspace() {
 
             // Add a final builder message
             setAgents(prev => [
-                ...prev.map(a => a.id === BUILDER_AGENT.id ? {
+                ...prev.map(a => a.id === CREATOR_AGENT_ID ? {
                     ...a, messages: [...a.messages, {
                         id: crypto.randomUUID(),
                         role: 'builder' as const,
@@ -333,8 +331,8 @@ export default function UnifiedWorkspace() {
                                         onClick={() => setSelectedAgentId(agent.id)}
                                         className={`relative group transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] flex-shrink-0 cursor-pointer w-72 h-80 bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/50 border border-slate-100 snap-center hover:-translate-y-2 hover:shadow-2xl hover:shadow-indigo-100/50 hover:border-indigo-200 ${dragOverIdx === index ? 'scale-105 ring-4 ring-indigo-100' : ''}`}
                                     >
-                                        {/* Action Menu Trigger (Skip for Builder) */}
-                                        {agent.id !== BUILDER_AGENT.id && (
+                                        {/* Action Menu Trigger (Skip for Creator) */}
+                                        {agent.id !== CREATOR_AGENT_ID && (
                                             <div className="absolute top-4 right-4 z-10">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === agent.id ? null : agent.id); }}
@@ -366,7 +364,7 @@ export default function UnifiedWorkspace() {
                                                 <img
                                                     src={agent.avatar}
                                                     alt={agent.name}
-                                                    className={`w-32 h-32 rounded-full object-cover shadow-md pointer-events-none ${agent.id === BUILDER_AGENT.id ? 'bg-indigo-100 p-2' : ''}`}
+                                                    className={`w-32 h-32 rounded-full object-cover shadow-md pointer-events-none ${agent.id === CREATOR_AGENT_ID ? 'bg-indigo-100 p-2' : ''}`}
                                                 />
                                                 <div className={`absolute bottom-1 right-1 w-6 h-6 rounded-full border-4 border-white ${agent.color}`}></div>
                                             </div>
@@ -387,7 +385,7 @@ export default function UnifiedWorkspace() {
 
                                 {/* Additional Create New Agent Card Shortcut */}
                                 <div
-                                    onClick={() => setSelectedAgentId(BUILDER_AGENT.id)}
+                                    onClick={() => setSelectedAgentId(CREATOR_AGENT_ID)}
                                     className="w-72 h-80 rounded-3xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50/50 cursor-pointer transition-colors snap-center flex-shrink-0"
                                 >
                                     <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4 group-hover:bg-indigo-100 transition-colors">
@@ -425,7 +423,7 @@ export default function UnifiedWorkspace() {
                                         <img
                                             src={agent.avatar}
                                             alt={agent.name}
-                                            className={`w-full h-full rounded-full object-cover shadow-sm ${agent.id === BUILDER_AGENT.id ? 'bg-indigo-100 p-1' : ''}`}
+                                            className={`w-full h-full rounded-full object-cover shadow-sm ${agent.id === CREATOR_AGENT_ID ? 'bg-indigo-100 p-1' : ''}`}
                                         />
                                         <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${agent.color}`}></div>
 
@@ -441,7 +439,7 @@ export default function UnifiedWorkspace() {
                             ))}
                         </div>
                         {/* Show polling status if builder is active and polling */}
-                        {activeAgent?.id === BUILDER_AGENT.id && isPolling && (
+                        {activeAgent?.id === CREATOR_AGENT_ID && isPolling && (
                             <div className="mt-2 text-xs text-slate-500 font-medium flex items-center gap-1 text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 animate-in fade-in slide-in-from-top-2">
                                 <Loader2 size={14} className="animate-spin" />
                                 {pollStatus}
@@ -468,7 +466,7 @@ export default function UnifiedWorkspace() {
                                     <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center overflow-hidden shadow-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}>
                                         {msg.role === 'user' ? <User size={20} /> : (
                                             /* eslint-disable-next-line @next/next/no-img-element */
-                                            <img src={activeAgent.avatar} alt="Agent" className={`w-full h-full object-cover ${activeAgent.id === BUILDER_AGENT.id ? 'p-1' : ''}`} />
+                                            <img src={activeAgent.avatar} alt="Agent" className={`w-full h-full object-cover ${activeAgent.id === CREATOR_AGENT_ID ? 'p-1' : ''}`} />
                                         )}
                                     </div>
 
@@ -485,7 +483,7 @@ export default function UnifiedWorkspace() {
                                 <div className="flex gap-4 flex-row animate-in fade-in duration-300">
                                     <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-white shadow-sm border border-slate-100">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={activeAgent.avatar} alt="Agent" className={`w-full h-full object-cover grayscale opacity-80 ${activeAgent.id === BUILDER_AGENT.id ? 'p-1' : ''}`} />
+                                        <img src={activeAgent.avatar} alt="Agent" className={`w-full h-full object-cover grayscale opacity-80 ${activeAgent.id === CREATOR_AGENT_ID ? 'p-1' : ''}`} />
                                     </div>
                                     <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-sm p-4 shadow-sm flex items-center gap-2">
                                         <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
