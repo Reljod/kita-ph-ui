@@ -48,7 +48,7 @@ export default function LoginPage() {
             };
 
             login(user, data.access_token);
-            router.push('/');
+            router.push('/dashboard');
         } catch (err: unknown) {
             console.error('Login failed:', err);
             // Typecast for axios error shape

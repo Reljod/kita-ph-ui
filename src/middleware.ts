@@ -7,7 +7,7 @@ export function middleware(request: NextRequest) {
 
     if (isAuthPage) {
         if (token) {
-            return NextResponse.redirect(new URL('/', request.url));
+            return NextResponse.redirect(new URL('/dashboard', request.url));
         }
         return null;
     }
