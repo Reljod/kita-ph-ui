@@ -7,7 +7,7 @@ import {
     MessageSquare, ChevronLeft, Bot, Sparkles, Plus, Loader2, Zap, CheckCircle2, ChevronRight, X
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Agent, Message } from '@/store/useAgentStore';
+import { Agent, Message, useAgentStore } from '@/store/useAgentStore';
 
 const CREATOR_AGENT_ID = 'agent-creator';
 
@@ -27,7 +27,7 @@ export default function UnifiedWorkspace() {
     });
 
     // Local state for all agents (Persistent Builder + Fetched + Newly created)
-    const [agents, setAgents] = useState<Agent[]>([]);
+    const { agents, setAgents, setAgentChatId, addMessage, setMessages, removeAgent, addAgent } = useAgentStore();
     const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
     // Initialization
@@ -74,6 +74,50 @@ export default function UnifiedWorkspace() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [agents, selectedAgentId, isTyping]);
 
+    // Parse Backend Messages
+    const parseBackendMessages = (backendMessages: any[]): Message[] => {
+        return backendMessages.map((msg: any) => {
+            const content = msg.parts
+                ? msg.parts
+                    .filter((part: any) => part.part_kind !== 'thinking')
+                    .map((part: any) => part.content)
+                    .join('\n')
+                : msg.content || '';
+
+            return {
+                id: msg.run_id || msg.id || crypto.randomUUID(),
+                role: msg.kind === 'request' ? 'user' : 'agent',
+                content: content
+            };
+        });
+    };
+
+    // Fetch Chat History when agent is selected
+    useEffect(() => {
+        const fetchHistory = async () => {
+            if (!selectedAgentId || selectedAgentId === CREATOR_AGENT_ID) return;
+
+            const agent = agents.find(a => a.id === selectedAgentId);
+            if (!agent) return;
+
+            try {
+                const response = await api.get(`/agent/${selectedAgentId}/chat`);
+                const chats = response.data || [];
+                if (chats.length > 0) {
+                    // Pick the latest chat for simplicity for now
+                    const latestChat = chats[chats.length - 1];
+                    setAgentChatId(selectedAgentId, latestChat.id);
+                    const parsedMessages = parseBackendMessages(latestChat.messages);
+                    setMessages(selectedAgentId, parsedMessages);
+                }
+            } catch (error) {
+                console.error('Failed to fetch chat history:', error);
+            }
+        };
+
+        fetchHistory();
+    }, [selectedAgentId, setAgentChatId, setMessages]);
+
     const handleDragStart = (e: React.DragEvent, index: number) => {
         setDraggedIdx(index);
         e.dataTransfer.effectAllowed = 'move';
@@ -103,7 +147,7 @@ export default function UnifiedWorkspace() {
     const handleDelete = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
         if (id === CREATOR_AGENT_ID) return; // Cannot delete agent creator
-        setAgents(prev => prev.filter(a => a.id !== id));
+        removeAgent(id);
         setOpenMenuId(null);
         if (selectedAgentId === id) setSelectedAgentId(null);
     };
@@ -123,13 +167,7 @@ export default function UnifiedWorkspace() {
         if (!targetAgentId) return;
 
         const newMsg: Message = { id: crypto.randomUUID(), role: 'user', content: inputValue };
-
-        setAgents(prev => prev.map(agent => {
-            if (agent.id === targetAgentId) {
-                return { ...agent, messages: [...agent.messages, newMsg] };
-            }
-            return agent;
-        }));
+        addMessage(targetAgentId, newMsg);
 
         setInputValue('');
 
@@ -137,28 +175,45 @@ export default function UnifiedWorkspace() {
         if (targetAgentId === CREATOR_AGENT_ID) {
             simulateBuilderProcess(newMsg.content);
         } else {
-            simulateAgentReply(targetAgentId, newMsg.content);
+            sendMessageToAgent(targetAgentId, newMsg.content);
         }
     };
 
-    const simulateAgentReply = (agentId: string, userText: string) => {
+    const sendMessageToAgent = async (agentId: string, userText: string) => {
         setIsTyping(true);
-        setTimeout(() => {
-            setIsTyping(false);
-            setAgents(prev => prev.map(agent => {
-                if (agent.id === agentId) {
-                    return {
-                        ...agent,
-                        messages: [...agent.messages, {
-                            id: crypto.randomUUID(),
-                            role: 'agent',
-                            content: `This is a simulated response from ${agent.name}. I received your message: "${userText}"`
-                        }]
-                    };
+        const agent = agents.find(a => a.id === agentId);
+        if (!agent) return;
+
+        try {
+            let response;
+            if (agent.chatId) {
+                // Continue existing chat
+                response = await api.post(`/agent/${agentId}/chat/${agent.chatId}/continue`, {
+                    message: userText
+                });
+            } else {
+                // Start new chat
+                response = await api.post(`/agent/${agentId}/chat`, {
+                    message: userText
+                });
+                if (response.data?.id) {
+                    setAgentChatId(agentId, response.data.id);
                 }
-                return agent;
-            }));
-        }, 1200);
+            }
+
+            const chatData = response.data;
+            const parsedMessages = parseBackendMessages(chatData.messages);
+            setMessages(agentId, parsedMessages);
+        } catch (error) {
+            console.error('Failed to send message:', error);
+            addMessage(agentId, {
+                id: crypto.randomUUID(),
+                role: 'agent',
+                content: 'Sorry, I encountered an error. Please try again later.'
+            });
+        } finally {
+            setIsTyping(false);
+        }
     };
 
     const simulateBuilderProcess = (userText: string) => {
@@ -171,9 +226,7 @@ export default function UnifiedWorkspace() {
                 content: `I understand you want to create an agent for: "${userText}". I'm putting together the core logic and personality right now. I'll monitor the build process for you.`
             };
 
-            setAgents(prev => prev.map(a =>
-                a.id === CREATOR_AGENT_ID ? { ...a, messages: [...a.messages, builderReply] } : a
-            ));
+            addMessage(CREATOR_AGENT_ID, builderReply);
 
             startPollingSimulation();
         }, 1500);
@@ -206,17 +259,13 @@ export default function UnifiedWorkspace() {
             setNewAgent(generatedAgent);
             setShowBirthAnimation(true);
 
-            // Add a final builder message
-            setAgents(prev => [
-                ...prev.map(a => a.id === CREATOR_AGENT_ID ? {
-                    ...a, messages: [...a.messages, {
-                        id: crypto.randomUUID(),
-                        role: 'builder' as const,
-                        content: `Success! ${generatedAgent.name} has been created and is ready to use.`
-                    } as Message]
-                } : a),
-                generatedAgent
-            ]);
+            // Add a final builder message and the new agent
+            addMessage(CREATOR_AGENT_ID, {
+                id: crypto.randomUUID(),
+                role: 'builder' as const,
+                content: `Success! ${generatedAgent.name} has been created and is ready to use.`
+            });
+            addAgent(generatedAgent);
         }, 6000);
     };
 

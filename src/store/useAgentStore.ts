@@ -13,6 +13,7 @@ export interface Agent {
     avatar: string;
     color: string;
     messages: Message[];
+    chatId?: string;
 }
 
 interface AgentState {
@@ -22,7 +23,9 @@ interface AgentState {
     addAgent: (agent: Agent) => void;
     removeAgent: (id: string) => void;
     setActiveAgent: (id: string | null) => void;
+    setAgentChatId: (agentId: string, chatId: string) => void;
     addMessage: (agentId: string, message: Message) => void;
+    setMessages: (agentId: string, messages: Message[]) => void;
     reorderAgents: (startIndex: number, endIndex: number) => void;
 }
 
@@ -42,6 +45,12 @@ export const useAgentStore = create<AgentState>((set) => ({
         })),
 
     setActiveAgent: (id) => set({ activeAgentId: id }),
+    setAgentChatId: (agentId, chatId) =>
+        set((state) => ({
+            agents: state.agents.map((agent) =>
+                agent.id === agentId ? { ...agent, chatId } : agent
+            ),
+        })),
 
     addMessage: (agentId, message) =>
         set((state) => ({
@@ -49,6 +58,13 @@ export const useAgentStore = create<AgentState>((set) => ({
                 agent.id === agentId
                     ? { ...agent, messages: [...agent.messages, message] }
                     : agent
+            ),
+        })),
+
+    setMessages: (agentId, messages) =>
+        set((state) => ({
+            agents: state.agents.map((agent) =>
+                agent.id === agentId ? { ...agent, messages } : agent
             ),
         })),
 
