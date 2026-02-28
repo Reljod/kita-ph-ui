@@ -40,7 +40,7 @@ export default function UnifiedWorkspace() {
     });
 
     // Local state for all agents (Persistent Builder + Fetched + Newly created)
-    const { agents, setAgents, setAgentChatId, addMessage, setMessages, removeAgent, addAgent } = useAgentStore();
+    const { agents, setAgents, setAgentChatId, setAgentChats, addMessage, setMessages, removeAgent, addAgent } = useAgentStore();
     const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
     // Initialization
@@ -108,19 +108,28 @@ export default function UnifiedWorkspace() {
     // Fetch Chat History when agent is selected
     useEffect(() => {
         const fetchHistory = async () => {
-            if (!selectedAgentId || selectedAgentId === CREATOR_AGENT_ID) return;
+            if (!selectedAgentId) return;
 
             const agent = agents.find(a => a.id === selectedAgentId);
             if (!agent) return;
 
             try {
-                const response = await api.get(`/agent/${selectedAgentId}/chat`);
-                const chats = response.data || [];
-                if (chats.length > 0) {
-                    // Pick the latest chat for simplicity for now
-                    const latestChat = chats[chats.length - 1];
-                    setAgentChatId(selectedAgentId, latestChat.id);
-                    const parsedMessages = parseBackendMessages(latestChat.messages);
+                // 1. Fetch chat list with previews
+                const chatsResponse = await api.get(`/agent/${selectedAgentId}/chat?preview=true`);
+                const chatItems = chatsResponse.data || [];
+                setAgentChats(selectedAgentId, chatItems);
+
+                // 2. Fetch messages for the current chat or latest
+                let targetChatId = agent.chatId;
+                if (!targetChatId && chatItems.length > 0) {
+                    targetChatId = chatItems[0].id;
+                }
+
+                if (targetChatId) {
+                    setAgentChatId(selectedAgentId, targetChatId as string);
+                    const messagesResponse = await api.get(`/agent/${selectedAgentId}/chat/${targetChatId as string}`);
+                    const chatData = messagesResponse.data;
+                    const parsedMessages = parseBackendMessages(chatData.messages);
                     setMessages(selectedAgentId, parsedMessages);
                 }
             } catch (error) {
@@ -129,7 +138,21 @@ export default function UnifiedWorkspace() {
         };
 
         fetchHistory();
-    }, [selectedAgentId, setAgentChatId, setMessages]);
+    }, [selectedAgentId, setAgentChatId, setAgentChats, setMessages]);
+
+    const handleSwitchChat = async (chatId: string) => {
+        if (!selectedAgentId) return;
+
+        try {
+            setAgentChatId(selectedAgentId, chatId);
+            const response = await api.get(`/agent/${selectedAgentId}/chat/${chatId}`);
+            const chatData = response.data;
+            const parsedMessages = parseBackendMessages(chatData.messages);
+            setMessages(selectedAgentId, parsedMessages);
+        } catch (error) {
+            console.error('Failed to switch chat:', error);
+        }
+    };
 
     const handleDragStart = (e: React.DragEvent, index: number) => {
         setDraggedIdx(index);
@@ -186,7 +209,9 @@ export default function UnifiedWorkspace() {
 
         // Check if target is builder
         if (targetAgentId === CREATOR_AGENT_ID) {
-            simulateBuilderProcess(newMsg.content);
+            // We can still trigger simulation for UI feedback, 
+            // but we SHOULD also use the real API to persist messages.
+            sendMessageToAgent(targetAgentId, newMsg.content);
         } else {
             sendMessageToAgent(targetAgentId, newMsg.content);
         }
@@ -509,83 +534,135 @@ export default function UnifiedWorkspace() {
                         )}
                     </div>
 
-                    <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto opacity-100 translate-y-0 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]">
-                        {/* Header info (optional) */}
-                        {activeAgent && (
-                            <div className="px-6 py-4 flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-500 border-b border-slate-100 bg-white/50 backdrop-blur-sm">
-                                <h2 className="text-lg font-bold text-slate-800">{activeAgent.name}</h2>
-                                <p className="text-sm text-slate-500">{activeAgent.role}</p>
+                    <div className="flex-1 flex overflow-hidden w-full max-w-7xl mx-auto opacity-100 translate-y-0 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]">
+                        {/* --- CHAT HISTORY SIDEBAR --- */}
+                        <aside className="w-72 border-r border-slate-200 bg-white flex flex-col shrink-0 animate-in slide-in-from-left-4 duration-500 overflow-hidden">
+                            <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                                    <MessageSquare size={16} /> History
+                                </h3>
                             </div>
-                        )}
-
-                        {/* Chat Messages */}
-                        <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6">
-                            {activeAgent?.messages.map((msg) => (
-                                <div
-                                    key={msg.id}
-                                    className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+                            <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-thin scrollbar-thumb-slate-200">
+                                {activeAgent?.chats?.map((chat) => (
+                                    <button
+                                        key={chat.id}
+                                        onClick={() => handleSwitchChat(chat.id)}
+                                        className={`w-full text-left p-3 rounded-xl transition-all group ${activeAgent.chatId === chat.id
+                                            ? 'bg-indigo-50 border-indigo-100 ring-1 ring-indigo-200'
+                                            : 'hover:bg-slate-50 border-transparent'
+                                            } border mb-1`}
+                                    >
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className={`text-[11px] font-bold ${activeAgent.chatId === chat.id ? 'text-indigo-600' : 'text-slate-400'}`}>
+                                                {new Date(chat.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                            {activeAgent.chatId === chat.id && <Zap size={10} className="text-indigo-500 animate-pulse" />}
+                                        </div>
+                                        <p className={`text-xs line-clamp-2 ${activeAgent.chatId === chat.id ? 'text-indigo-900 font-medium' : 'text-slate-600'}`}>
+                                            {chat.preview || 'New Conversation'}
+                                        </p>
+                                    </button>
+                                ))}
+                                {(!activeAgent?.chats || activeAgent.chats.length === 0) && (
+                                    <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400">
+                                        <MessageSquare size={32} className="mb-2 opacity-20" />
+                                        <p className="text-xs">No history yet</p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="p-4 border-t border-slate-100">
+                                <button
+                                    onClick={() => {
+                                        if (selectedAgentId) {
+                                            setAgentChatId(selectedAgentId, "");
+                                            setMessages(selectedAgentId, []);
+                                        }
+                                    }}
+                                    className="w-full py-2 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors shadow-sm"
                                 >
-                                    <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center overflow-hidden shadow-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}>
-                                        {msg.role === 'user' ? <User size={20} /> : (
-                                            /* eslint-disable-next-line @next/next/no-img-element */
-                                            <img src={activeAgent.avatar} alt="Agent" className={`w-full h-full object-cover ${activeAgent.id === CREATOR_AGENT_ID ? 'p-1' : ''}`} />
-                                        )}
-                                    </div>
+                                    <Plus size={14} /> New Chat
+                                </button>
+                            </div>
+                        </aside>
 
-                                    <div className={`max-w-[75%] rounded-2xl p-4 shadow-sm text-[15px] leading-relaxed ${msg.role === 'user'
-                                        ? 'bg-indigo-600 text-white rounded-tr-sm'
-                                        : 'bg-white border border-slate-100 text-slate-700 rounded-tl-sm'
-                                        }`}>
-                                        <MarkdownRenderer
-                                            content={msg.content}
-                                            className={msg.role === 'user' ? 'prose-invert text-white/95' : 'text-slate-700'}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-
-                            {isTyping && activeAgent && (
-                                <div className="flex gap-4 flex-row animate-in fade-in duration-300">
-                                    <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-white shadow-sm border border-slate-100">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={activeAgent.avatar} alt="Agent" className={`w-full h-full object-cover grayscale opacity-80 ${activeAgent.id === CREATOR_AGENT_ID ? 'p-1' : ''}`} />
-                                    </div>
-                                    <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-sm p-4 shadow-sm flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                                        <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                                        <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                                    </div>
+                        <div className="flex-1 flex flex-col min-w-0">
+                            {/* Header info (optional) */}
+                            {activeAgent && (
+                                <div className="px-6 py-4 flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-500 border-b border-slate-100 bg-white/50 backdrop-blur-sm">
+                                    <h2 className="text-lg font-bold text-slate-800">{activeAgent.name}</h2>
+                                    <p className="text-sm text-slate-500">{activeAgent.role}</p>
                                 </div>
                             )}
-                            <div ref={messagesEndRef} />
-                        </main>
 
-                        {/* Input Footer */}
-                        <footer className="p-4 md:p-6 bg-slate-50/80 backdrop-blur-sm border-t border-slate-200 mt-auto sticky bottom-0">
-                            <form
-                                onSubmit={handleSendMessage}
-                                className="relative flex items-center max-w-3xl mx-auto shadow-sm rounded-2xl bg-white focus-within:ring-2 focus-within:ring-indigo-100 focus-within:border-indigo-300 border border-slate-200 transition-all"
-                            >
-                                <input
-                                    type="text"
-                                    value={inputValue}
-                                    onChange={(e) => setInputValue(e.target.value)}
-                                    placeholder={isPolling ? "Waiting for agent build..." : `Message ${activeAgent?.name}...`}
-                                    disabled={isPolling || isTyping}
-                                    className="w-full py-4 pl-4 pr-14 bg-transparent outline-none rounded-2xl disabled:opacity-60"
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={!inputValue.trim() || isTyping || isPolling}
-                                    className="absolute right-2 p-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-xl transition-colors flex items-center justify-center"
+                            {/* Chat Messages */}
+                            <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6">
+                                {activeAgent?.messages.map((msg) => (
+                                    <div
+                                        key={msg.id}
+                                        className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+                                    >
+                                        <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center overflow-hidden shadow-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}>
+                                            {msg.role === 'user' ? <User size={20} /> : (
+                                                /* eslint-disable-next-line @next/next/no-img-element */
+                                                <img src={activeAgent.avatar} alt="Agent" className={`w-full h-full object-cover ${activeAgent.id === CREATOR_AGENT_ID ? 'p-1' : ''}`} />
+                                            )}
+                                        </div>
+
+                                        <div className={`max-w-[75%] rounded-2xl p-4 shadow-sm text-[15px] leading-relaxed ${msg.role === 'user'
+                                            ? 'bg-indigo-600 text-white rounded-tr-sm'
+                                            : 'bg-white border border-slate-100 text-slate-700 rounded-tl-sm'
+                                            }`}>
+                                            <MarkdownRenderer
+                                                content={msg.content}
+                                                className={msg.role === 'user' ? 'prose-invert text-white/95' : 'text-slate-700'}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {isTyping && activeAgent && (
+                                    <div className="flex gap-4 flex-row animate-in fade-in duration-300">
+                                        <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-white shadow-sm border border-slate-100">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={activeAgent.avatar} alt="Agent" className={`w-full h-full object-cover grayscale opacity-80 ${activeAgent.id === CREATOR_AGENT_ID ? 'p-1' : ''}`} />
+                                        </div>
+                                        <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-sm p-4 shadow-sm flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                        </div>
+                                    </div>
+                                )}
+                                <div ref={messagesEndRef} />
+                            </main>
+
+                            {/* Input Footer */}
+                            <footer className="p-4 md:p-6 bg-slate-50/80 backdrop-blur-sm border-t border-slate-200 mt-auto sticky bottom-0">
+                                <form
+                                    onSubmit={handleSendMessage}
+                                    className="relative flex items-center max-w-3xl mx-auto shadow-sm rounded-2xl bg-white focus-within:ring-2 focus-within:ring-indigo-100 focus-within:border-indigo-300 border border-slate-200 transition-all"
                                 >
-                                    <Send size={18} className="ml-0.5" />
-                                </button>
-                            </form>
-                            <div className="text-center mt-3 text-xs text-slate-400 font-medium">
-                                AI agents can make mistakes. Verify important information.
-                            </div>
-                        </footer>
+                                    <input
+                                        type="text"
+                                        value={inputValue}
+                                        onChange={(e) => setInputValue(e.target.value)}
+                                        placeholder={isPolling ? "Waiting for agent build..." : `Message ${activeAgent?.name}...`}
+                                        disabled={isPolling || isTyping}
+                                        className="w-full py-4 pl-4 pr-14 bg-transparent outline-none rounded-2xl disabled:opacity-60"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={!inputValue.trim() || isTyping || isPolling}
+                                        className="absolute right-2 p-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-xl transition-colors flex items-center justify-center"
+                                    >
+                                        <Send size={18} className="ml-0.5" />
+                                    </button>
+                                </form>
+                                <div className="text-center mt-3 text-xs text-slate-400 font-medium">
+                                    AI agents can make mistakes. Verify important information.
+                                </div>
+                            </footer>
+                        </div>
                     </div>
                 </>
             )}

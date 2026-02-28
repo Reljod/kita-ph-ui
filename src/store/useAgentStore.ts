@@ -6,6 +6,12 @@ export interface Message {
     content: string;
 }
 
+export interface ChatItem {
+    id: string;
+    preview: string;
+    updated_at: string;
+}
+
 export interface Agent {
     id: string;
     name: string;
@@ -14,6 +20,7 @@ export interface Agent {
     color: string;
     messages: Message[];
     chatId?: string;
+    chats?: ChatItem[];
 }
 
 interface AgentState {
@@ -24,6 +31,7 @@ interface AgentState {
     removeAgent: (id: string) => void;
     setActiveAgent: (id: string | null) => void;
     setAgentChatId: (agentId: string, chatId: string) => void;
+    setAgentChats: (agentId: string, chats: ChatItem[]) => void;
     addMessage: (agentId: string, message: Message) => void;
     setMessages: (agentId: string, messages: Message[]) => void;
     reorderAgents: (startIndex: number, endIndex: number) => void;
@@ -49,6 +57,13 @@ export const useAgentStore = create<AgentState>((set) => ({
         set((state) => ({
             agents: state.agents.map((agent) =>
                 agent.id === agentId ? { ...agent, chatId } : agent
+            ),
+        })),
+
+    setAgentChats: (agentId, chats) =>
+        set((state) => ({
+            agents: state.agents.map((agent) =>
+                agent.id === agentId ? { ...agent, chats } : agent
             ),
         })),
 
