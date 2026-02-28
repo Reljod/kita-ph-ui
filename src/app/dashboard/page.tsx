@@ -8,8 +8,21 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Agent, Message, useAgentStore } from '@/store/useAgentStore';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { cn } from '@/lib/utils';
 
 const CREATOR_AGENT_ID = 'agent-creator';
+
+function MarkdownRenderer({ content, className }: { content: string, className?: string }) {
+    return (
+        <div className={cn("markdown-content text-[15px] max-w-none break-words", className)}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {content}
+            </ReactMarkdown>
+        </div>
+    );
+}
 
 export default function UnifiedWorkspace() {
     // Query to fetch agents from Kita API
@@ -523,7 +536,10 @@ export default function UnifiedWorkspace() {
                                         ? 'bg-indigo-600 text-white rounded-tr-sm'
                                         : 'bg-white border border-slate-100 text-slate-700 rounded-tl-sm'
                                         }`}>
-                                        {msg.content}
+                                        <MarkdownRenderer
+                                            content={msg.content}
+                                            className={msg.role === 'user' ? 'prose-invert text-white/95' : 'text-slate-700'}
+                                        />
                                     </div>
                                 </div>
                             ))}
