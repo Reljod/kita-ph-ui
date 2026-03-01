@@ -47,7 +47,7 @@ export default function LoginPage() {
                 avatar: `https://api.dicebear.com/7.x/notionists/svg?seed=${email}`,
             };
 
-            login(user, data.access_token);
+            login(user, data.access_token, data.refresh_token);
             router.push('/dashboard');
         } catch (err: unknown) {
             console.error('Login failed:', err);

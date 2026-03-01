@@ -89,20 +89,22 @@ export default function UnifiedWorkspace() {
 
     // Parse Backend Messages
     const parseBackendMessages = (backendMessages: any[]): Message[] => {
-        return backendMessages.map((msg: any) => {
-            const content = msg.parts
-                ? msg.parts
-                    .filter((part: any) => part.part_kind !== 'thinking')
-                    .map((part: any) => part.content)
-                    .join('\n')
-                : msg.content || '';
+        return backendMessages
+            .map((msg: any, index: number) => {
+                const content = msg.parts
+                    ? msg.parts
+                        .filter((part: any) => part.part_kind === 'user-prompt' || part.part_kind === 'text')
+                        .map((part: any) => part.content)
+                        .join('\n')
+                    : msg.content || '';
 
-            return {
-                id: msg.run_id || msg.id || crypto.randomUUID(),
-                role: msg.kind === 'request' ? 'user' : 'agent',
-                content: content
-            };
-        });
+                return {
+                    id: `${msg.id || msg.run_id || crypto.randomUUID()}-${msg.kind}-${index}`,
+                    role: (msg.kind === 'request' ? 'user' : 'agent') as 'user' | 'agent',
+                    content: content
+                };
+            })
+            .filter(msg => msg.content.trim() !== '');
     };
 
     // Fetch Chat History when agent is selected
