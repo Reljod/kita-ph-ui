@@ -6,10 +6,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useSidebarStore } from '@/store/useSidebarStore';
+
 export function Header() {
     const { user, logout } = useAuthStore();
     const router = useRouter();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const { toggle: toggleSidebar } = useSidebarStore();
 
     const handleLogout = () => {
         logout();
@@ -18,14 +21,35 @@ export function Header() {
 
     return (
         <header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-md border-b border-slate-200">
-            <div className="flex h-16 items-center justify-between px-6 max-w-7xl mx-auto">
-                <Link href="/" className="flex gap-2 items-center">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                        <div className="w-2 h-2 bg-white/60 rounded-full ml-1"></div>
-                    </div>
-                    <span className="font-bold text-lg text-slate-900 tracking-tight">Kita<span className="text-indigo-600">Agents</span></span>
-                </Link>
+            <div className="flex h-16 items-center justify-between px-6">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={toggleSidebar}
+                        aria-label="Toggle sidebar"
+                        className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+                    >
+                        {/* Sidebar panel icon */}
+                        <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            {/* Outer rounded rectangle */}
+                            <rect x="1.5" y="1.5" width="21" height="21" rx="4.5" ry="4.5" stroke="currentColor" strokeWidth="2.2" fill="none" />
+                            {/* Vertical divider for the panel */}
+                            <line x1="7.5" y1="1.5" x2="7.5" y2="22.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                        </svg>
+                    </button>
+                    <Link href="/" className="flex gap-2 items-center">
+                        <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                            <div className="w-2 h-2 bg-white/60 rounded-full ml-1"></div>
+                        </div>
+                        <span className="font-bold text-lg text-slate-900 tracking-tight">Kita<span className="text-indigo-600">Agents</span></span>
+                    </Link>
+                </div>
 
                 <div className="flex items-center gap-4 relative">
                     <button
