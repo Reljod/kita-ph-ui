@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Agent } from '@/types/agents';
 import { AgentGrid } from '@/components/dashboard/AgentGrid';
-import { AgentAvatarScroll } from '@/components/dashboard/AgentAvatarScroll';
 import { Bot, Sparkles, Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -73,11 +72,6 @@ export default function DashboardPage() {
 
                 {agents.length > 0 && (
                     <>
-                        {/* Infinite avatar scroll — sorted by last updated */}
-                        <div className="w-full mb-10">
-                            <AgentAvatarScroll agents={agents} />
-                        </div>
-
                         <AgentGrid agents={agents} />
                     </>
                 )}
