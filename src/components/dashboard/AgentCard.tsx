@@ -30,7 +30,7 @@ export function AgentCard({ agent, onDelete, dragProps, isDragOver }: Props) {
         <div
             {...dragProps}
             onClick={handleCardClick}
-            className={`relative group transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] flex-shrink-0 cursor-pointer w-72 h-80 bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/50 border border-slate-100 snap-center hover:-translate-y-2 hover:shadow-2xl hover:shadow-indigo-100/50 hover:border-indigo-200 ${isDragOver ? 'scale-105 ring-4 ring-indigo-100' : ''}`}
+            className={`relative group flex-shrink-0 cursor-pointer w-72 h-80 bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/50 border border-slate-100 snap-center transition-colors duration-200 hover:border-indigo-200 ${isDragOver ? 'scale-105 ring-4 ring-indigo-100' : ''}`}
         >
             {/* Action Menu */}
             <div className="absolute top-4 right-4 z-10">
@@ -76,8 +76,8 @@ export function AgentCard({ agent, onDelete, dragProps, isDragOver }: Props) {
                     <div className={`absolute bottom-1 right-1 w-6 h-6 rounded-full border-4 border-white ${agent.color ?? 'bg-blue-600'}`} />
                 </div>
 
-                <h3 className="text-xl font-bold text-slate-900 mb-1">{agent.name}</h3>
-                <p className="text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-auto">
+                <h3 className="text-xl font-bold text-slate-900 mb-1 w-full truncate">{agent.name}</h3>
+                <p className="text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-auto max-w-full truncate">
                     {agent.role}
                 </p>
 

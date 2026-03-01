@@ -44,7 +44,7 @@ export function AgentGrid({ agents }: Props) {
     };
 
     return (
-        <div className="w-full max-w-6xl mx-auto flex px-8 gap-6 overflow-x-auto pb-8 snap-x snap-mandatory hide-scrollbar">
+        <div className="w-full max-w-6xl mx-auto flex px-8 gap-6 overflow-x-auto pb-8 snap-x snap-proximity scroll-smooth hide-scrollbar" style={{ willChange: 'scroll-position' }}>
             {localAgents.map((agent, index) => (
                 <AgentCard
                     key={agent.id}
