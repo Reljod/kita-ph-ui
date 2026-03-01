@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Agent } from '@/types/agents';
 import { AgentGrid } from '@/components/dashboard/AgentGrid';
+import { AgentAvatarScroll } from '@/components/dashboard/AgentAvatarScroll';
 import { Bot, Sparkles, Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -18,6 +19,7 @@ export default function DashboardPage() {
                     role: a.role,
                     avatar: a.avatar ?? `https://api.dicebear.com/7.x/bottts/svg?seed=${a.id}&backgroundColor=2563eb`,
                     color: a.color ?? 'bg-blue-600',
+                    updated_at: a.updated_at,
                 }));
             } catch {
                 return [];
@@ -40,7 +42,7 @@ export default function DashboardPage() {
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`
             }} />
             <div className="flex-1 flex flex-col items-center overflow-hidden py-12 bg-slate-50">
-                <div className="text-center mb-12 px-4">
+                <div className="text-center mb-8 px-4">
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-600 text-sm font-semibold mb-6">
                         <Sparkles size={16} /> My Workspace
                     </div>
@@ -69,7 +71,16 @@ export default function DashboardPage() {
                     )}
                 </div>
 
-                {agents.length > 0 && <AgentGrid agents={agents} />}
+                {agents.length > 0 && (
+                    <>
+                        {/* Infinite avatar scroll — sorted by last updated */}
+                        <div className="w-full mb-10">
+                            <AgentAvatarScroll agents={agents} />
+                        </div>
+
+                        <AgentGrid agents={agents} />
+                    </>
+                )}
             </div>
         </>
     );

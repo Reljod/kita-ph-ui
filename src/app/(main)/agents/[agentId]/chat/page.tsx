@@ -37,13 +37,17 @@ export default function AgentChatIndexPage() {
             const rawAgent = agents.find((a: any) => a.id === agentId);
             if (!rawAgent) throw new Error('Agent not found');
 
-            const agent: Agent = {
-                id: rawAgent.id,
-                name: rawAgent.name,
-                role: rawAgent.role,
-                avatar: rawAgent.avatar ?? `https://api.dicebear.com/7.x/bottts/svg?seed=${rawAgent.id}&backgroundColor=2563eb`,
-                color: rawAgent.color ?? 'bg-blue-600',
-            };
+            const mapAgent = (a: any): Agent => ({
+                id: a.id,
+                name: a.name,
+                role: a.role,
+                avatar: a.avatar ?? `https://api.dicebear.com/7.x/bottts/svg?seed=${a.id}&backgroundColor=2563eb`,
+                color: a.color ?? 'bg-blue-600',
+                updated_at: a.updated_at,
+            });
+
+            const agent = mapAgent(rawAgent);
+            const allAgents = agents.map(mapAgent);
 
             const chatsRes = await api.get(`/agent/${agentId}/chat?preview=true`);
             const chats: ChatItem[] = chatsRes.data ?? [];
@@ -51,7 +55,6 @@ export default function AgentChatIndexPage() {
             // Auto-redirect to latest chat
             if (chats.length > 0) {
                 router.replace(`/agents/${agentId}/chat/${chats[0].id}`);
-                // Still render with what we have while redirect happens
             }
 
             let messages: Message[] = [];
@@ -60,7 +63,7 @@ export default function AgentChatIndexPage() {
                 messages = parseBackendMessages(msgsRes.data?.messages ?? []);
             }
 
-            return { agent, chats, activeChatId: chats[0]?.id ?? null, messages };
+            return { agent, allAgents, chats, activeChatId: chats[0]?.id ?? null, messages };
         },
         staleTime: 0,
     });
@@ -90,9 +93,11 @@ export default function AgentChatIndexPage() {
     return (
         <ChatView
             agent={data.agent}
+            allAgents={data.allAgents}
             initialChatId={data.activeChatId}
             initialChats={data.chats}
             initialMessages={data.messages}
         />
     );
 }
+

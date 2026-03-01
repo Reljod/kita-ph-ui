@@ -1,15 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Agent, ChatItem, Message } from '@/types/agents';
 import { api } from '@/lib/api';
 import { ChatHistorySidebar } from './ChatHistorySidebar';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
+import { ChevronRight, ArrowLeftRight } from 'lucide-react';
 
 interface Props {
     agent: Agent;
+    allAgents?: Agent[];
     initialChatId: string | null;
     initialChats: ChatItem[];
     initialMessages: Message[];
@@ -34,7 +36,7 @@ function parseBackendMessages(backendMessages: any[]): Message[] {
         .filter((msg) => msg.content.trim() !== '');
 }
 
-export function ChatView({ agent, initialChatId, initialChats, initialMessages }: Props) {
+export function ChatView({ agent, allAgents = [], initialChatId, initialChats, initialMessages }: Props) {
     const router = useRouter();
 
     const [chats, setChats] = useState<ChatItem[]>(initialChats);
@@ -42,8 +44,20 @@ export function ChatView({ agent, initialChatId, initialChats, initialMessages }
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [inputValue, setInputValue] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [switcherOpen, setSwitcherOpen] = useState(false);
+    const switcherRef = useRef<HTMLDivElement>(null);
 
-    // When user selects a different chat from the sidebar — update URL for reload persistence
+    // Close switcher on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) {
+                setSwitcherOpen(false);
+            }
+        };
+        if (switcherOpen) document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [switcherOpen]);
+
     const handleSelectChat = async (chatId: string) => {
         router.push(`/agents/${agent.id}/chat/${chatId}`);
         setActiveChatId(chatId);
@@ -56,13 +70,15 @@ export function ChatView({ agent, initialChatId, initialChats, initialMessages }
         }
     };
 
-    // New Chat — posts to backend, then navigates to the new chatId URL
     const handleNewChat = async () => {
-        // Optimistically clear messages
         setMessages([]);
         setActiveChatId(null);
-        // Navigate to base agent chat route; the page will show empty state
         router.push(`/agents/${agent.id}/chat`);
+    };
+
+    const handleSwitchAgent = (target: Agent) => {
+        setSwitcherOpen(false);
+        router.push(`/agents/${target.id}/chat`);
     };
 
     const handleSendMessage = async (e?: React.FormEvent) => {
@@ -73,7 +89,6 @@ export function ChatView({ agent, initialChatId, initialChats, initialMessages }
         setInputValue('');
         setIsTyping(true);
 
-        // Optimistic user message
         const optimisticMsg: Message = {
             id: crypto.randomUUID(),
             role: 'user',
@@ -92,11 +107,9 @@ export function ChatView({ agent, initialChatId, initialChats, initialMessages }
             const chatData = res.data;
             const newChatId: string = chatData.id ?? activeChatId;
 
-            // If this was a new chat, update URL and local state so reload persists
             if (!activeChatId && newChatId) {
                 setActiveChatId(newChatId);
                 router.replace(`/agents/${agent.id}/chat/${newChatId}`);
-                // Also refresh chats list
                 try {
                     const chatsRes = await api.get(`/agent/${agent.id}/chat?preview=true`);
                     setChats(chatsRes.data ?? []);
@@ -116,19 +129,84 @@ export function ChatView({ agent, initialChatId, initialChats, initialMessages }
         }
     };
 
+    const otherAgents = allAgents.filter((a) => a.id !== agent.id);
+
     return (
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden relative">
             <ChatHistorySidebar
                 chats={chats}
                 activeChatId={activeChatId}
                 onSelectChat={handleSelectChat}
                 onNewChat={handleNewChat}
             />
+
             <div className="flex-1 flex flex-col overflow-hidden">
-                {/* Agent header info */}
-                <div className="px-6 py-4 shrink-0 border-b border-slate-100 bg-white/50 backdrop-blur-sm">
-                    <h2 className="text-lg font-bold text-slate-800">{agent.name}</h2>
-                    <p className="text-sm text-slate-500">{agent.role}</p>
+                {/* ── Agent Header ── */}
+                <div className="px-5 py-3 shrink-0 border-b border-slate-100 bg-white flex items-center justify-between gap-4">
+                    {/* Left: avatar + name */}
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={agent.avatar ?? `https://api.dicebear.com/7.x/bottts/svg?seed=${agent.id}`}
+                                alt={agent.name}
+                                className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-md"
+                            />
+                            {/* Online indicator */}
+                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-white rounded-full" />
+                        </div>
+                        <div className="min-w-0">
+                            <h2 className="text-sm font-bold text-slate-800 leading-tight truncate">{agent.name}</h2>
+                            <p className="text-xs text-indigo-500 font-medium truncate">{agent.role}</p>
+                        </div>
+                    </div>
+
+                    {/* Right: switch agent button */}
+                    {otherAgents.length > 0 && (
+                        <div className="relative" ref={switcherRef}>
+                            <button
+                                onClick={() => setSwitcherOpen((o) => !o)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 transition-all"
+                            >
+                                <ArrowLeftRight size={13} />
+                                Switch Agent
+                            </button>
+
+                            {/* Agent switcher popover */}
+                            {switcherOpen && (
+                                <div className="absolute right-0 top-full mt-2 z-50 w-72 bg-white border border-slate-100 rounded-2xl shadow-2xl shadow-slate-200/60 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                                    <div className="px-4 py-3 border-b border-slate-50 bg-slate-50/80">
+                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Switch to another agent</p>
+                                    </div>
+                                    <ul className="py-2 max-h-80 overflow-y-auto">
+                                        {otherAgents.map((a) => (
+                                            <li key={a.id}>
+                                                <button
+                                                    onClick={() => handleSwitchAgent(a)}
+                                                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-indigo-50 transition-colors group text-left"
+                                                >
+                                                    <div className="relative shrink-0">
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img
+                                                            src={a.avatar ?? `https://api.dicebear.com/7.x/bottts/svg?seed=${a.id}`}
+                                                            alt={a.name}
+                                                            className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm group-hover:border-indigo-200 transition-all"
+                                                        />
+                                                        <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${a.color ?? 'bg-blue-500'}`} />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-sm font-semibold text-slate-800 truncate group-hover:text-indigo-700">{a.name}</p>
+                                                        <p className="text-xs text-slate-400 truncate">{a.role}</p>
+                                                    </div>
+                                                    <ChevronRight size={14} className="text-slate-300 group-hover:text-indigo-400 shrink-0 transition-colors" />
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Independently scrollable messages area */}
@@ -146,3 +224,4 @@ export function ChatView({ agent, initialChatId, initialChats, initialMessages }
         </div>
     );
 }
+

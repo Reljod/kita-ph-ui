@@ -16,4 +16,5 @@ export interface Agent {
     role: string;
     avatar?: string;
     color?: string;
+    updated_at?: string;
 }

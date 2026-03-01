@@ -2,6 +2,7 @@
 
 import { useAuthStore } from '@/store/useAuthStore';
 import { LogOut, User as UserIcon } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -18,13 +19,13 @@ export function Header() {
     return (
         <header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-md border-b border-slate-200">
             <div className="flex h-16 items-center justify-between px-6 max-w-7xl mx-auto">
-                <div className="flex gap-2 items-center">
+                <Link href="/" className="flex gap-2 items-center">
                     <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
                         <div className="w-2 h-2 bg-white rounded-full"></div>
                         <div className="w-2 h-2 bg-white/60 rounded-full ml-1"></div>
                     </div>
                     <span className="font-bold text-lg text-slate-900 tracking-tight">Kita<span className="text-indigo-600">Agents</span></span>
-                </div>
+                </Link>
 
                 <div className="flex items-center gap-4 relative">
                     <button

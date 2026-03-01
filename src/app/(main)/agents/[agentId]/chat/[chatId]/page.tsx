@@ -33,19 +33,23 @@ export default function AgentChatPage() {
     const { data, isLoading, isError } = useQuery({
         queryKey: ['agent-chat', agentId, chatId],
         queryFn: async () => {
-            // 1. Fetch agent info (from the list, then find our agent)
+            // 1. Fetch all agents
             const agentsRes = await api.get('/agent');
             const agents: any[] = agentsRes.data ?? [];
             const rawAgent = agents.find((a: any) => a.id === agentId);
             if (!rawAgent) throw new Error('Agent not found');
 
-            const agent: Agent = {
-                id: rawAgent.id,
-                name: rawAgent.name,
-                role: rawAgent.role,
-                avatar: rawAgent.avatar ?? `https://api.dicebear.com/7.x/bottts/svg?seed=${rawAgent.id}&backgroundColor=2563eb`,
-                color: rawAgent.color ?? 'bg-blue-600',
-            };
+            const mapAgent = (a: any): Agent => ({
+                id: a.id,
+                name: a.name,
+                role: a.role,
+                avatar: a.avatar ?? `https://api.dicebear.com/7.x/bottts/svg?seed=${a.id}&backgroundColor=2563eb`,
+                color: a.color ?? 'bg-blue-600',
+                updated_at: a.updated_at,
+            });
+
+            const agent = mapAgent(rawAgent);
+            const allAgents = agents.map(mapAgent);
 
             // 2. Fetch chat history list
             const chatsRes = await api.get(`/agent/${agentId}/chat?preview=true`);
@@ -66,7 +70,7 @@ export default function AgentChatPage() {
                 messages = parseBackendMessages(msgsRes.data?.messages ?? []);
             }
 
-            return { agent, chats, activeChatId, messages };
+            return { agent, allAgents, chats, activeChatId, messages };
         },
         staleTime: 0, // Always fresh on page load
     });
@@ -96,6 +100,7 @@ export default function AgentChatPage() {
     return (
         <ChatView
             agent={data.agent}
+            allAgents={data.allAgents}
             initialChatId={data.activeChatId}
             initialChats={data.chats}
             initialMessages={data.messages}
