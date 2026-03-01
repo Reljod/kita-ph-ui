@@ -13,7 +13,7 @@ interface AuthState {
     user: User | null;
     isAuthenticated: boolean;
     isLoading: boolean;
-    login: (user: User, token: string) => void;
+    login: (user: User, token: string, refreshToken: string) => void;
     logout: () => void;
     checkAuth: () => void;
 }
@@ -23,14 +23,19 @@ export const useAuthStore = create<AuthState>((set) => ({
     isAuthenticated: false,
     isLoading: true,
 
-    login: (user, token) => {
+    login: (user, token, refreshToken) => {
         Cookies.set('token', token, { expires: 7 }); // 7 days
+        Cookies.set('refreshToken', refreshToken, { expires: 7 }); // 7 days
         set({ user, isAuthenticated: true, isLoading: false });
     },
 
     logout: () => {
         Cookies.remove('token');
+        Cookies.remove('refreshToken');
         set({ user: null, isAuthenticated: false, isLoading: false });
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
     },
 
     checkAuth: () => {
