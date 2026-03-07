@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Agent, ChatItem, Message } from '@/types/agents';
 import { api } from '@/lib/api';
 import { ChatHistorySidebar } from './ChatHistorySidebar';
@@ -38,6 +39,7 @@ function parseBackendMessages(backendMessages: any[]): Message[] {
 
 export function ChatView({ agent, allAgents = [], initialChatId, initialChats, initialMessages }: Props) {
     const router = useRouter();
+    const queryClient = useQueryClient();
 
     const [chats, setChats] = useState<ChatItem[]>(initialChats);
     const [activeChatId, setActiveChatId] = useState<string | null>(initialChatId);
@@ -46,6 +48,16 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
     const [isTyping, setIsTyping] = useState(false);
     const [switcherOpen, setSwitcherOpen] = useState(false);
     const switcherRef = useRef<HTMLDivElement>(null);
+
+    // Sync chats and messages state when props change (revalidation)
+    useEffect(() => {
+        setChats(initialChats);
+    }, [initialChats]);
+
+    useEffect(() => {
+        setMessages(initialMessages);
+        setActiveChatId(initialChatId);
+    }, [initialMessages, initialChatId]);
 
     // Close switcher on outside click
     useEffect(() => {
@@ -109,11 +121,11 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
 
             if (!activeChatId && newChatId) {
                 setActiveChatId(newChatId);
-                router.replace(`/agents/${agent.id}/chat/${newChatId}`);
-                try {
-                    const chatsRes = await api.get(`/agent/${agent.id}/chat?preview=true`);
-                    setChats(chatsRes.data ?? []);
-                } catch { /* non-critical */ }
+                // Use router.replace with scroll: false to prevent jumps
+                router.replace(`/agents/${agent.id}/chat/${newChatId}`, { scroll: false });
+
+                // Invalidate the chat list query (which is part of our consolidated query key)
+                queryClient.invalidateQueries({ queryKey: ['agent-chat-data', agent.id] });
             }
 
             const parsed = parseBackendMessages(chatData.messages ?? []);

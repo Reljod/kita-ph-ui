@@ -1,11 +1,11 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { ChatView } from '@/components/chat/ChatView';
-import { Loader2, ChevronLeft } from 'lucide-react';
 import { Agent, ChatItem, Message } from '@/types/agents';
+import { ChatView } from '@/components/chat/ChatView';
+import { Loader2 } from 'lucide-react';
 
 function parseBackendMessages(backendMessages: any[]): Message[] {
     return backendMessages
@@ -25,13 +25,16 @@ function parseBackendMessages(backendMessages: any[]): Message[] {
         .filter((msg) => msg.content.trim() !== '');
 }
 
-export default function AgentChatIndexPage() {
-    const { agentId } = useParams<{ agentId: string }>();
-    const router = useRouter();
+export default function AgentChatPage() {
+    const params = useParams();
+    const agentId = params.agentId as string;
+    const chatIdArray = params.chatId as string[] | undefined;
+    const chatId = chatIdArray?.[0] || null;
 
     const { data, isLoading, isError } = useQuery({
-        queryKey: ['agent-chat-index', agentId],
+        queryKey: ['agent-chat-data', agentId, chatId],
         queryFn: async () => {
+            // 1. Fetch all agents
             const agentsRes = await api.get('/agent');
             const agents: any[] = agentsRes.data ?? [];
             const rawAgent = agents.find((a: any) => a.id === agentId);
@@ -49,23 +52,20 @@ export default function AgentChatIndexPage() {
             const agent = mapAgent(rawAgent);
             const allAgents = agents.map(mapAgent);
 
+            // 2. Fetch chat history list
             const chatsRes = await api.get(`/agent/${agentId}/chat?preview=true`);
             const chats: ChatItem[] = chatsRes.data ?? [];
 
-            // Auto-redirect to latest chat
-            if (chats.length > 0) {
-                router.replace(`/agents/${agentId}/chat/${chats[0].id}`);
-            }
-
+            // 3. Fetch messages if we have a chatId
             let messages: Message[] = [];
-            if (chats.length > 0) {
-                const msgsRes = await api.get(`/agent/${agentId}/chat/${chats[0].id}`);
+            if (chatId) {
+                const msgsRes = await api.get(`/agent/${agentId}/chat/${chatId}`);
                 messages = parseBackendMessages(msgsRes.data?.messages ?? []);
             }
 
-            return { agent, allAgents, chats, activeChatId: chats[0]?.id ?? null, messages };
+            return { agent, allAgents, chats, activeChatId: chatId, messages };
         },
-        staleTime: 0,
+        staleTime: 5000,
     });
 
     if (isLoading) {
@@ -80,18 +80,13 @@ export default function AgentChatIndexPage() {
         return (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-500">
                 <p className="text-lg font-medium">Could not load this agent.</p>
-                <button
-                    onClick={() => router.push('/dashboard')}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors text-sm"
-                >
-                    <ChevronLeft size={16} /> Back to Dashboard
-                </button>
             </div>
         );
     }
 
     return (
         <ChatView
+            key={agentId} // Remount only when agent changes, not when chatId changes
             agent={data.agent}
             allAgents={data.allAgents}
             initialChatId={data.activeChatId}
@@ -100,4 +95,3 @@ export default function AgentChatIndexPage() {
         />
     );
 }
-
