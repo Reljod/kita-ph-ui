@@ -14,6 +14,10 @@ export interface Agent {
     id: string;
     name: string;
     role: string;
+    goal?: string;
+    backstory?: string;
+    personalities?: string[];
+    llm_id?: string;
     avatar?: string;
     color?: string;
     updated_at?: string;

@@ -44,7 +44,7 @@ export function AgentCard({ agent, onDelete, dragProps, isDragOver }: Props) {
                     <div className="absolute top-full right-0 mt-2 w-36 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-1 z-20 animate-in fade-in slide-in-from-top-2">
                         <button
                             className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
-                            onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
+                            onClick={(e) => { e.stopPropagation(); setMenuOpen(false); router.push(`/agents/${agent.id}/edit`); }}
                         >
                             <Edit2 size={14} /> Edit
                         </button>
