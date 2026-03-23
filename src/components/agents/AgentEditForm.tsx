@@ -21,6 +21,12 @@ import {
     Loader2,
     CheckCircle2
 } from 'lucide-react';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Props {
     agentId: string;
@@ -193,105 +199,109 @@ export function AgentEditForm({ agentId }: Props) {
 
     return (
         <div className="w-full max-w-5xl mx-auto px-4 py-8 animate-in fade-in slide-in-from-bottom-4">
-            {/* Memory Edit Modal (Simple overlay) */}
-            {editingMemory && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 p-8">
-                        <div className="flex items-center gap-3 text-indigo-600 mb-6">
-                            <Brain size={24} />
-                            <h2 className="text-xl font-bold text-slate-900">Edit Memory</h2>
-                        </div>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Title</label>
-                                <input
-                                    type="text"
-                                    value={editingMemory.title}
-                                    onChange={(e) => setEditingMemory({ ...editingMemory, title: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all"
-                                />
+            {/* Memory Edit Modal */}
+            <Dialog open={!!editingMemory} onOpenChange={(open) => !open && setEditingMemory(null)}>
+                <DialogContent className="sm:max-w-lg rounded-3xl shadow-2xl border-slate-100 p-8">
+                    <DialogHeader className="flex-row items-center gap-3 text-indigo-600 mb-6">
+                        <Brain size={24} />
+                        <DialogTitle className="text-xl font-bold text-slate-900">Edit Memory</DialogTitle>
+                    </DialogHeader>
+                    {editingMemory && (
+                        <>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Title</label>
+                                    <input
+                                        type="text"
+                                        value={editingMemory.title}
+                                        onChange={(e) => setEditingMemory({ ...editingMemory, title: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Content</label>
+                                    <textarea
+                                        value={editingMemory.content}
+                                        onChange={(e) => setEditingMemory({ ...editingMemory, content: e.target.value })}
+                                        rows={5}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all resize-none"
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Content</label>
-                                <textarea
-                                    value={editingMemory.content}
-                                    onChange={(e) => setEditingMemory({ ...editingMemory, content: e.target.value })}
-                                    rows={5}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all resize-none"
-                                />
+                            <div className="flex gap-3 mt-8">
+                                <button
+                                    onClick={() => setEditingMemory(null)}
+                                    className="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+                                >
+                                    CANCEL
+                                </button>
+                                <button
+                                    onClick={() => updateMemoryMutation.mutate({
+                                        id: editingMemory.id,
+                                        agent_id: editingMemory.agent_id,
+                                        data: { title: editingMemory.title, content: editingMemory.content }
+                                    })}
+                                    className="flex-1 py-3 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center justify-center gap-2"
+                                >
+                                    {updateMemoryMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                    SAVE CHANGES
+                                </button>
                             </div>
-                        </div>
-                        <div className="flex gap-3 mt-8">
-                            <button
-                                onClick={() => setEditingMemory(null)}
-                                className="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
-                            >
-                                CANCEL
-                            </button>
-                            <button
-                                onClick={() => updateMemoryMutation.mutate({
-                                    id: editingMemory.id,
-                                    agent_id: editingMemory.agent_id,
-                                    data: { title: editingMemory.title, content: editingMemory.content }
-                                })}
-                                className="flex-1 py-3 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center justify-center gap-2"
-                            >
-                                {updateMemoryMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                SAVE CHANGES
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
 
-            {/* Memory Add Modal (Simple overlay) */}
-            {addingMemory && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 p-8">
-                        <div className="flex items-center gap-3 text-indigo-600 mb-6">
-                            <Brain size={24} />
-                            <h2 className="text-xl font-bold text-slate-900">Add Knowledge</h2>
-                        </div>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Title</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. My Father's Birthday"
-                                    value={addingMemory.title}
-                                    onChange={(e) => setAddingMemory({ ...addingMemory, title: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all placeholder:text-slate-300"
-                                />
+            {/* Memory Add Modal */}
+            <Dialog open={!!addingMemory} onOpenChange={(open) => !open && setAddingMemory(null)}>
+                <DialogContent className="sm:max-w-lg rounded-3xl shadow-2xl border-slate-100 p-8">
+                    <DialogHeader className="flex-row items-center gap-3 text-indigo-600 mb-6">
+                        <Brain size={24} />
+                        <DialogTitle className="text-xl font-bold text-slate-900">Add Knowledge</DialogTitle>
+                    </DialogHeader>
+                    {addingMemory && (
+                        <>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Title</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. My Father's Birthday"
+                                        value={addingMemory.title}
+                                        onChange={(e) => setAddingMemory({ ...addingMemory, title: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all placeholder:text-slate-300"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Content</label>
+                                    <textarea
+                                        placeholder="Add specific context or knowledge..."
+                                        value={addingMemory.content}
+                                        onChange={(e) => setAddingMemory({ ...addingMemory, content: e.target.value })}
+                                        rows={5}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all resize-none placeholder:text-slate-300"
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Content</label>
-                                <textarea
-                                    placeholder="Add specific context or knowledge..."
-                                    value={addingMemory.content}
-                                    onChange={(e) => setAddingMemory({ ...addingMemory, content: e.target.value })}
-                                    rows={5}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all resize-none placeholder:text-slate-300"
-                                />
+                            <div className="flex gap-3 mt-8">
+                                <button
+                                    onClick={() => setAddingMemory(null)}
+                                    className="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+                                >
+                                    CANCEL
+                                </button>
+                                <button
+                                    onClick={() => addMemoryMutation.mutate(addingMemory)}
+                                    className="flex-1 py-3 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center justify-center gap-2"
+                                >
+                                    {addMemoryMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                                    ADD KNOWLEDGE
+                                </button>
                             </div>
-                        </div>
-                        <div className="flex gap-3 mt-8">
-                            <button
-                                onClick={() => setAddingMemory(null)}
-                                className="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
-                            >
-                                CANCEL
-                            </button>
-                            <button
-                                onClick={() => addMemoryMutation.mutate(addingMemory)}
-                                className="flex-1 py-3 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center justify-center gap-2"
-                            >
-                                {addMemoryMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                                ADD KNOWLEDGE
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 pb-8 border-b border-slate-100">
