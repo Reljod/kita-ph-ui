@@ -6,16 +6,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Agent } from '@/types/agents';
 import { RagResponse, RagCreateRequest, RagUpdateRequest } from '@/types/memory';
-import { 
-    Save, 
-    X, 
-    Plus, 
-    Trash2, 
-    Brain, 
-    User, 
-    Target, 
-    ScrollText, 
-    Sparkles, 
+import {
+    Save,
+    X,
+    Plus,
+    Trash2,
+    Brain,
+    User,
+    Target,
+    ScrollText,
+    Sparkles,
     Cpu,
     Edit2,
     Loader2,
@@ -42,6 +42,7 @@ export function AgentEditForm({ agentId }: Props) {
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [editingMemory, setEditingMemory] = useState<RagResponse | null>(null);
+    const [addingMemory, setAddingMemory] = useState<RagCreateRequest | null>(null);
 
     // Fetch Agent Data
     const { data: agent, isLoading: isLoadingAgent } = useQuery<Agent>({
@@ -130,6 +131,7 @@ export function AgentEditForm({ agentId }: Props) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['agent-memories', agentId] });
+            setAddingMemory(null);
         },
     });
 
@@ -242,13 +244,62 @@ export function AgentEditForm({ agentId }: Props) {
                 </div>
             )}
 
+            {/* Memory Add Modal (Simple overlay) */}
+            {addingMemory && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 p-8">
+                        <div className="flex items-center gap-3 text-indigo-600 mb-6">
+                            <Brain size={24} />
+                            <h2 className="text-xl font-bold text-slate-900">Add Knowledge</h2>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Title</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. My Father's Birthday"
+                                    value={addingMemory.title}
+                                    onChange={(e) => setAddingMemory({ ...addingMemory, title: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all placeholder:text-slate-300"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Content</label>
+                                <textarea
+                                    placeholder="Add specific context or knowledge..."
+                                    value={addingMemory.content}
+                                    onChange={(e) => setAddingMemory({ ...addingMemory, content: e.target.value })}
+                                    rows={5}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all resize-none placeholder:text-slate-300"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex gap-3 mt-8">
+                            <button
+                                onClick={() => setAddingMemory(null)}
+                                className="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+                            >
+                                CANCEL
+                            </button>
+                            <button
+                                onClick={() => addMemoryMutation.mutate(addingMemory)}
+                                className="flex-1 py-3 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center justify-center gap-2"
+                            >
+                                {addMemoryMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                                ADD KNOWLEDGE
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 pb-8 border-b border-slate-100">
                 <div className="flex items-center gap-5">
                     <div className={`w-20 h-20 rounded-3xl ${agent?.color || 'bg-indigo-600'} flex items-center justify-center text-white shadow-xl shadow-indigo-100`}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img 
-                            src={agent?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${agentId}`} 
+                        <img
+                            src={agent?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${agentId}`}
                             alt={formData.name}
                             className="w-16 h-16 object-contain"
                         />
@@ -280,18 +331,16 @@ export function AgentEditForm({ agentId }: Props) {
             <div className="flex gap-8 mb-8 border-b border-slate-100">
                 <button
                     onClick={() => setActiveTab('details')}
-                    className={`pb-4 text-sm font-bold tracking-wide transition-all relative ${
-                        activeTab === 'details' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
-                    }`}
+                    className={`pb-4 text-sm font-bold tracking-wide transition-all relative ${activeTab === 'details' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
+                        }`}
                 >
                     AGENT DETAILS
                     {activeTab === 'details' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
                 </button>
                 <button
                     onClick={() => setActiveTab('memory')}
-                    className={`pb-4 text-sm font-bold tracking-wide transition-all relative ${
-                        activeTab === 'memory' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
-                    }`}
+                    className={`pb-4 text-sm font-bold tracking-wide transition-all relative ${activeTab === 'memory' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
+                        }`}
                 >
                     MEMORY & KNOWLEDGE
                     {activeTab === 'memory' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
@@ -306,7 +355,7 @@ export function AgentEditForm({ agentId }: Props) {
                             <User size={18} />
                             <h2 className="font-bold uppercase tracking-wider text-xs">Identity</h2>
                         </div>
-                        
+
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Agent Name</label>
                             <input
@@ -426,14 +475,8 @@ export function AgentEditForm({ agentId }: Props) {
                                 <Brain size={20} />
                                 <h2 className="font-bold uppercase tracking-wider text-sm">Unified Knowledge Base</h2>
                             </div>
-                            <button 
-                                onClick={() => {
-                                    const title = prompt('Memory Title:');
-                                    const content = prompt('Memory Content:');
-                                    if (title && content) {
-                                        addMemoryMutation.mutate({ title, content });
-                                    }
-                                }}
+                            <button
+                                onClick={() => setAddingMemory({ title: '', content: '', agent_id: agentId })}
                                 className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-all text-sm font-bold"
                             >
                                 <Plus size={16} /> ADD KNOWLEDGE
@@ -451,9 +494,8 @@ export function AgentEditForm({ agentId }: Props) {
                                             <div className="flex items-center gap-3 mb-1.5 flex-wrap">
                                                 <h3 className="font-bold text-slate-800 truncate">{mem.title}</h3>
                                                 <div className="flex gap-2">
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter ${
-                                                        mem.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'
-                                                    }`}>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter ${mem.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'
+                                                        }`}>
                                                         {mem.status}
                                                     </span>
                                                     {!mem.agent_id && (
@@ -466,13 +508,13 @@ export function AgentEditForm({ agentId }: Props) {
                                             <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">{mem.content}</p>
                                         </div>
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                            <button 
+                                            <button
                                                 onClick={() => setEditingMemory(mem)}
                                                 className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                                             >
                                                 <Edit2 size={16} />
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => deleteMemoryMutation.mutate({ id: mem.id, agent_id: mem.agent_id })}
                                                 className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                             >
