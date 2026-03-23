@@ -20,5 +20,6 @@ export interface Agent {
     llm_id?: string;
     avatar?: string;
     color?: string;
+    tools?: string[];
     updated_at?: string;
 }

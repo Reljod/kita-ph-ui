@@ -19,8 +19,15 @@ import {
     Cpu,
     Edit2,
     Loader2,
-    CheckCircle2
+    CheckCircle2,
+    Hammer,
+    Wrench,
+    Globe,
+    Database,
+    Zap,
+    ArrowRight
 } from 'lucide-react';
+import { Tool } from '@/types/tools';
 import {
     Dialog,
     DialogContent,
@@ -30,6 +37,7 @@ import {
 
 interface Props {
     agentId: string;
+    readOnly?: boolean;
 }
 
 interface Llm {
@@ -39,10 +47,10 @@ interface Llm {
     model: string;
 }
 
-export function AgentEditForm({ agentId }: Props) {
+export function AgentEditForm({ agentId, readOnly = false }: Props) {
     const router = useRouter();
     const queryClient = useQueryClient();
-    const [activeTab, setActiveTab] = useState<'details' | 'memory'>('details');
+    const [activeTab, setActiveTab] = useState<'details' | 'memory' | 'tools'>('details');
     const [personalities, setPersonalities] = useState<string[]>([]);
     const [newPersonality, setNewPersonality] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -82,6 +90,15 @@ export function AgentEditForm({ agentId }: Props) {
         queryKey: ['org-memories'],
         queryFn: async () => {
             const res = await api.get('/memory');
+            return res.data;
+        },
+    });
+
+    // Fetch All Available Tools
+    const { data: availableTools = [] } = useQuery<Tool[]>({
+        queryKey: ['tools'],
+        queryFn: async () => {
+            const res = await api.get('/tool');
             return res.data;
         },
     });
@@ -165,7 +182,28 @@ export function AgentEditForm({ agentId }: Props) {
         },
     });
 
+    const addToolMutation = useMutation({
+        mutationFn: async (toolId: string) => {
+            const res = await api.post(`/agent/${agentId}/tools/add`, { tool_ids: [toolId] });
+            return res.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['agent', agentId] });
+        },
+    });
+
+    const removeToolMutation = useMutation({
+        mutationFn: async (toolId: string) => {
+            const res = await api.post(`/agent/${agentId}/tools/remove`, { tool_ids: [toolId] });
+            return res.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['agent', agentId] });
+        },
+    });
+
     const handleSubmit = async (e: React.FormEvent) => {
+        if (readOnly) return;
         e.preventDefault();
         setIsSaving(true);
         try {
@@ -320,20 +358,31 @@ export function AgentEditForm({ agentId }: Props) {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => router.back()}
-                        className="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2"
-                    >
-                        <X size={16} /> Cancel
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={isSaving}
-                        className="px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-70"
-                    >
-                        {isSaving ? <Loader2 size={16} className="animate-spin" /> : saveSuccess ? <CheckCircle2 size={16} /> : <Save size={16} />}
-                        {isSaving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save Changes'}
-                    </button>
+                    {readOnly ? (
+                        <button
+                            onClick={() => router.push(`/agents/${agentId}/edit`)}
+                            className="px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all flex items-center gap-2"
+                        >
+                            <Edit2 size={16} /> Edit Agent
+                        </button>
+                    ) : (
+                        <>
+                            <button
+                                onClick={() => router.back()}
+                                className="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2"
+                            >
+                                <X size={16} /> Cancel
+                            </button>
+                            <button
+                                onClick={handleSubmit}
+                                disabled={isSaving}
+                                className="px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-70"
+                            >
+                                {isSaving ? <Loader2 size={16} className="animate-spin" /> : saveSuccess ? <CheckCircle2 size={16} /> : <Save size={16} />}
+                                {isSaving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save Changes'}
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -355,6 +404,14 @@ export function AgentEditForm({ agentId }: Props) {
                     MEMORY & KNOWLEDGE
                     {activeTab === 'memory' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
                 </button>
+                <button
+                    onClick={() => setActiveTab('tools')}
+                    className={`pb-4 text-sm font-bold tracking-wide transition-all relative ${activeTab === 'tools' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
+                        }`}
+                >
+                    TOOLS & CAPABILITIES
+                    {activeTab === 'tools' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />}
+                </button>
             </div>
 
             {activeTab === 'details' ? (
@@ -372,7 +429,8 @@ export function AgentEditForm({ agentId }: Props) {
                                 type="text"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800"
+                                disabled={readOnly}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 disabled:opacity-70"
                                 placeholder="e.g. Research Assistant"
                             />
                         </div>
@@ -383,7 +441,8 @@ export function AgentEditForm({ agentId }: Props) {
                                 type="text"
                                 value={formData.role}
                                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800"
+                                disabled={readOnly}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 disabled:opacity-70"
                                 placeholder="e.g. Expert in market analysis"
                             />
                         </div>
@@ -397,7 +456,8 @@ export function AgentEditForm({ agentId }: Props) {
                             <select
                                 value={formData.llm_id}
                                 onChange={(e) => setFormData({ ...formData, llm_id: e.target.value })}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 appearance-none"
+                                disabled={readOnly}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 appearance-none disabled:opacity-70"
                             >
                                 <option value="">Select a model...</option>
                                 {llms.map((llm) => (
@@ -419,8 +479,9 @@ export function AgentEditForm({ agentId }: Props) {
                             <textarea
                                 value={formData.goal}
                                 onChange={(e) => setFormData({ ...formData, goal: e.target.value })}
+                                disabled={readOnly}
                                 rows={3}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 resize-none"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 resize-none disabled:opacity-70"
                                 placeholder="What is the primary objective of this agent?"
                             />
                         </div>
@@ -433,8 +494,9 @@ export function AgentEditForm({ agentId }: Props) {
                             <textarea
                                 value={formData.backstory}
                                 onChange={(e) => setFormData({ ...formData, backstory: e.target.value })}
+                                disabled={readOnly}
                                 rows={4}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 resize-none"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 resize-none disabled:opacity-70"
                                 placeholder="What is the background and experience of this agent?"
                             />
                         </div>
@@ -448,35 +510,39 @@ export function AgentEditForm({ agentId }: Props) {
                                 {personalities.map((p, idx) => (
                                     <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-semibold">
                                         {p}
-                                        <button onClick={() => removePersonality(p)} className="hover:text-indigo-800">
-                                            <X size={14} />
-                                        </button>
+                                        {!readOnly && (
+                                            <button onClick={() => removePersonality(p)} className="hover:text-indigo-800">
+                                                <X size={14} />
+                                            </button>
+                                        )}
                                     </span>
                                 ))}
                                 {personalities.length === 0 && (
                                     <p className="text-sm text-slate-400 italic">No traits added yet.</p>
                                 )}
                             </div>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={newPersonality}
-                                    onChange={(e) => setNewPersonality(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddPersonality())}
-                                    className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all text-sm"
-                                    placeholder="Add a trait (e.g. Friendly)"
-                                />
-                                <button
-                                    onClick={(e) => { e.preventDefault(); handleAddPersonality(); }}
-                                    className="p-2 bg-indigo-100 text-indigo-600 rounded-xl hover:bg-indigo-200 transition-all"
-                                >
-                                    <Plus size={20} />
-                                </button>
-                            </div>
+                            {!readOnly && (
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={newPersonality}
+                                        onChange={(e) => setNewPersonality(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddPersonality())}
+                                        className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all text-sm"
+                                        placeholder="Add a trait (e.g. Friendly)"
+                                    />
+                                    <button
+                                        onClick={(e) => { e.preventDefault(); handleAddPersonality(); }}
+                                        className="p-2 bg-indigo-100 text-indigo-600 rounded-xl hover:bg-indigo-200 transition-all"
+                                    >
+                                        <Plus size={20} />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
-            ) : (
+            ) : activeTab === 'memory' ? (
                 <div className="space-y-8">
                     {/* Unified Knowledge Base */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
@@ -485,12 +551,14 @@ export function AgentEditForm({ agentId }: Props) {
                                 <Brain size={20} />
                                 <h2 className="font-bold uppercase tracking-wider text-sm">Unified Knowledge Base</h2>
                             </div>
-                            <button
-                                onClick={() => setAddingMemory({ title: '', content: '', agent_id: agentId })}
-                                className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-all text-sm font-bold"
-                            >
-                                <Plus size={16} /> ADD KNOWLEDGE
-                            </button>
+                            {!readOnly && (
+                                <button
+                                    onClick={() => setAddingMemory({ title: '', content: '', agent_id: agentId })}
+                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-all text-sm font-bold"
+                                >
+                                    <Plus size={16} /> ADD KNOWLEDGE
+                                </button>
+                            )}
                         </div>
                         <div className="divide-y divide-slate-100">
                             {isLoadingMemories ? (
@@ -517,20 +585,22 @@ export function AgentEditForm({ agentId }: Props) {
                                             </div>
                                             <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">{mem.content}</p>
                                         </div>
-                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                            <button
-                                                onClick={() => setEditingMemory(mem)}
-                                                className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                                            >
-                                                <Edit2 size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => deleteMemoryMutation.mutate({ id: mem.id, agent_id: mem.agent_id })}
-                                                className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
+                                        {!readOnly && (
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                <button
+                                                    onClick={() => setEditingMemory(mem)}
+                                                    className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteMemoryMutation.mutate({ id: mem.id, agent_id: mem.agent_id })}
+                                                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 ))
                             ) : (
@@ -544,6 +614,96 @@ export function AgentEditForm({ agentId }: Props) {
                             )}
                         </div>
                     </div>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Active Tools */}
+                    <div className="space-y-6">
+                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-2 text-indigo-600">
+                                    <Hammer size={18} />
+                                    <h2 className="font-bold uppercase tracking-wider text-xs">Active Tools</h2>
+                                </div>
+                                <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest leading-none">
+                                    {agent?.tools?.length || 0} Enabled
+                                </span>
+                            </div>
+
+                            <div className="space-y-3">
+                                {agent?.tools && agent.tools.length > 0 ? (
+                                    agent.tools.map((toolId) => {
+                                        const tool = availableTools.find(t => t.id === toolId || t.name === toolId);
+                                        return (
+                                            <div key={toolId} className="flex items-center justify-between p-4 bg-slate-50 hover:bg-white border-2 border-transparent hover:border-indigo-100 rounded-2xl transition-all group">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="p-2 bg-white rounded-xl shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                                        <Wrench size={18} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-900 text-sm tracking-tight">{tool?.name || toolId}</p>
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Integration Active</p>
+                                                    </div>
+                                                </div>
+                                                {!readOnly && (
+                                                    <button 
+                                                        onClick={() => removeToolMutation.mutate(toolId)}
+                                                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="py-12 text-center opacity-40">
+                                        <Hammer size={32} className="mx-auto mb-3" />
+                                        <p className="text-sm font-bold uppercase tracking-tighter">No tools assigned</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {!readOnly && (
+                        <div className="space-y-6">
+                            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                                <div className="flex items-center gap-2 text-slate-400 mb-6 font-bold uppercase tracking-wider text-xs">
+                                    <Plus size={18} />
+                                    Add New Capability
+                                </div>
+                                
+                                <div className="grid grid-cols-1 gap-3">
+                                    {availableTools
+                                        .filter(t => !agent?.tools?.includes(t.id) && !agent?.tools?.includes(t.name))
+                                        .map((tool) => (
+                                            <button
+                                                key={tool.id}
+                                                onClick={() => addToolMutation.mutate(tool.id)}
+                                                className="w-full flex items-center justify-between p-4 bg-white border border-slate-100 hover:border-indigo-400 hover:bg-indigo-50/30 rounded-2xl transition-all group text-left"
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div className="p-3 bg-slate-50 text-slate-400 rounded-2xl group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                                                        <Zap size={20} />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <h3 className="font-bold text-slate-800 text-sm group-hover:text-indigo-700 transition-colors uppercase tracking-tight">{tool.name}</h3>
+                                                        <p className="text-xs text-slate-500 font-medium line-clamp-1">{tool.description}</p>
+                                                    </div>
+                                                </div>
+                                                <ArrowRight size={18} className="text-slate-200 group-hover:text-indigo-400 transition-all opacity-0 group-hover:opacity-100 transform -translate-x-2 group-hover:translate-x-0" />
+                                            </button>
+                                        ))}
+                                    {availableTools.filter(t => !agent?.tools?.includes(t.id) && !agent?.tools?.includes(t.name)).length === 0 && (
+                                        <div className="py-12 text-center opacity-30 italic">
+                                            <p className="text-sm">All capabilities are already enabled.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
