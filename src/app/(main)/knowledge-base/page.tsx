@@ -1,29 +1,28 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { memoryService } from '@/services/memoryService';
-import { MemoryCard } from '@/components/memory/MemoryCard';
-import { AddMemoryModal } from '@/components/memory/AddMemoryModal';
+import { knowledgeService } from '@/services/knowledgeService';
+import { KnowledgeCard } from '@/components/knowledge/KnowledgeCard';
+import { AddKnowledgeModal } from '@/components/knowledge/AddKnowledgeModal';
 import { Agent } from '@/types/agents';
-import { RagResponse, RagCreateRequest, RagUpdateRequest } from '@/types/memory';
-import { Plus, Search, User, Globe, Loader2, BrainCircuit, List, LayoutGrid } from 'lucide-react';
-import { MemoryTable } from '@/components/memory/MemoryTable';
-import { useEffect } from 'react';
+import { FileResponse, FileStatus } from '@/types/knowledge';
+import { Plus, Search, User, Globe, Loader2, BookOpen, List, LayoutGrid } from 'lucide-react';
+import { KnowledgeTable } from '@/components/knowledge/KnowledgeTable';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
-export default function MemoryVaultPage() {
+export default function KnowledgeBasePage() {
     const queryClient = useQueryClient();
     const [scope, setScope] = useState<'agent' | 'org'>('org');
     const [selectedAgentId, setSelectedAgentId] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingMemory, setEditingMemory] = useState<RagResponse | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
-    const [deletingTitle, setDeletingTitle] = useState<string>('');
+    const [deletingFileName, setDeletingFileName] = useState<string>('');
+    const [editingFile, setEditingFile] = useState<FileResponse | null>(null);
 
     // Fetch Agents
     const { data: agents = [] } = useQuery<Agent[]>({
@@ -46,51 +45,40 @@ export default function MemoryVaultPage() {
         }
     }, [agents, selectedAgentId]);
 
-    // Fetch Memories
-    const { data: memories = [], isLoading } = useQuery<RagResponse[]>({
-        queryKey: ['memories', scope, selectedAgentId],
-        queryFn: () => memoryService.getAll(scope === 'agent' ? selectedAgentId : undefined),
+    // Fetch Knowledge Files
+    const { data: files = [], isLoading } = useQuery<FileResponse[]>({
+        queryKey: ['knowledge', scope, selectedAgentId],
+        queryFn: () => knowledgeService.getAll(scope === 'agent' ? selectedAgentId : undefined),
         enabled: scope === 'org' || !!selectedAgentId,
+        refetchInterval: (query) => {
+            const files = query.state.data as FileResponse[];
+            return files?.some(f => f.status === FileStatus.PENDING) ? 3000 : false;
+        }
     });
 
     // Handle Search locally
-    const filteredMemories = useMemo(() => {
-        if (!searchQuery) return memories;
+    const filteredFiles = useMemo(() => {
+        if (!searchQuery) return files;
         const lowQuery = searchQuery.toLowerCase();
-        return memories.filter(m =>
-            m.title.toLowerCase().includes(lowQuery) ||
-            m.content.toLowerCase().includes(lowQuery)
+        return files.filter(f =>
+            f.filename.toLowerCase().includes(lowQuery) ||
+            f.extension.toLowerCase().includes(lowQuery)
         );
-    }, [memories, searchQuery]);
+    }, [files, searchQuery]);
 
-    // Mutations
-    const createMutation = useMutation({
-        mutationFn: (data: RagCreateRequest) => memoryService.create(data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['memories'] });
-        },
-    });
-
-    const updateMutation = useMutation({
-        mutationFn: ({ id, data, agentId }: { id: string, data: RagUpdateRequest, agentId?: string }) =>
-            memoryService.update(id, data, agentId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['memories'] });
-        },
-    });
-
+    // Delete Mutation
     const deleteMutation = useMutation({
-        mutationFn: (id: string) => memoryService.delete(id, scope === 'agent' ? selectedAgentId : undefined),
+        mutationFn: (id: string) => knowledgeService.delete(id),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['memories'] });
+            queryClient.invalidateQueries({ queryKey: ['knowledge'] });
             setIsDeleteModalOpen(false);
             setDeletingId(null);
         },
     });
 
-    const confirmDelete = (id: string, title: string) => {
+    const confirmDelete = (id: string, filename: string) => {
         setDeletingId(id);
-        setDeletingTitle(title);
+        setDeletingFileName(filename);
         setIsDeleteModalOpen(true);
     };
 
@@ -101,28 +89,13 @@ export default function MemoryVaultPage() {
     };
 
     const handleAddClick = () => {
-        setEditingMemory(null);
+        setEditingFile(null);
         setIsModalOpen(true);
     };
 
-    const handleEditClick = (memory: RagResponse) => {
-        setEditingMemory(memory);
+    const handleEditClick = (file: FileResponse) => {
+        setEditingFile(file);
         setIsModalOpen(true);
-    };
-
-    const handleModalSubmit = async (data: RagCreateRequest | RagResponse) => {
-        if ('id' in data) {
-            // Update
-            const { id, title, content, agent_id } = data as RagResponse;
-            await updateMutation.mutateAsync({
-                id,
-                data: { title, content },
-                agentId: agent_id
-            });
-        } else {
-            // Create
-            await createMutation.mutateAsync(data as RagCreateRequest);
-        }
     };
 
     return (
@@ -132,10 +105,10 @@ export default function MemoryVaultPage() {
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div className="space-y-2">
                         <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">
-                            Memory Vault
+                            Knowledge Base
                         </h1>
                         <p className="text-slate-500 text-lg max-w-2xl">
-                            Manage semantic memories embedded for agents and the organization. These memories help your agents provide more accurate and contextual responses.
+                            Upload documents, logs, or any files to provide agents with extensive context. These files are indexed and used for RAG (Retrieval Augmented Generation).
                         </p>
                     </div>
                     <button
@@ -143,7 +116,7 @@ export default function MemoryVaultPage() {
                         className="flex items-center justify-center gap-2 px-6 py-3.5 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap self-start md:self-auto"
                     >
                         <Plus size={20} />
-                        Add Memory
+                        Add Knowledge
                     </button>
                 </div>
 
@@ -199,7 +172,7 @@ export default function MemoryVaultPage() {
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                             <input
                                 type="text"
-                                placeholder="Search memories..."
+                                placeholder="Search knowledge files..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all shadow-sm placeholder:text-slate-400"
@@ -229,26 +202,25 @@ export default function MemoryVaultPage() {
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center py-24 gap-4">
                         <Loader2 className="animate-spin text-indigo-600" size={48} />
-                        <p className="text-slate-500 font-medium">Loading memories...</p>
+                        <p className="text-slate-500 font-medium">Loading knowledge base...</p>
                     </div>
-                ) : filteredMemories.length > 0 ? (
+                ) : filteredFiles.length > 0 ? (
                     viewMode === 'grid' ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {filteredMemories.map((memory) => (
-                                <MemoryCard
-                                    key={memory.id}
-                                    memory={memory}
-                                    onDelete={(id) => confirmDelete(id, memory.title)}
-                                    onEdit={handleEditClick}
+                            {filteredFiles.map((file) => (
+                                <KnowledgeCard
+                                    key={file.id}
+                                    file={file}
+                                    onDelete={(id) => confirmDelete(id, file.filename)}
                                 />
                             ))}
                         </div>
                     ) : (
-                        <MemoryTable 
-                            memories={filteredMemories} 
+                        <KnowledgeTable 
+                            files={filteredFiles} 
                             onDelete={(id) => {
-                                const memory = memories.find(m => m.id === id);
-                                confirmDelete(id, memory?.title || 'this memory');
+                                const file = files.find(f => f.id === id);
+                                confirmDelete(id, file?.filename || 'this file');
                             }}
                             onEdit={handleEditClick}
                         />
@@ -256,22 +228,22 @@ export default function MemoryVaultPage() {
                 ) : (
                     <div className="flex flex-col items-center justify-center py-24 text-center px-4">
                         <div className="w-20 h-20 bg-indigo-50 rounded-3xl flex items-center justify-center text-indigo-400 mb-6">
-                            <BrainCircuit size={40} />
+                            <BookOpen size={40} />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-2">No memories found</h3>
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">No knowledge found</h3>
                         <p className="text-slate-500 max-w-sm">
                             {searchQuery
-                                ? `We couldn't find any memories matching "${searchQuery}".`
+                                ? `We couldn't find any files matching "${searchQuery}".`
                                 : scope === 'agent'
-                                    ? "This agent doesn't have any specific memories yet."
-                                    : "There are no organization-wide memories yet."}
+                                    ? "This agent doesn't have any specific knowledge base files yet."
+                                    : "There are no organization-wide knowledge base files yet."}
                         </p>
                         {!searchQuery && (
                             <button
                                 onClick={handleAddClick}
                                 className="mt-8 text-indigo-600 font-bold hover:text-indigo-700 underline underline-offset-4"
                             >
-                                Create your first memory
+                                Upload your first document
                             </button>
                         )}
                     </div>
@@ -279,14 +251,14 @@ export default function MemoryVaultPage() {
             </div>
 
             {/* Modal */}
-            <AddMemoryModal
+            <AddKnowledgeModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                onSubmit={handleModalSubmit}
+                onSuccess={() => queryClient.invalidateQueries({ queryKey: ['knowledge'] })}
                 agents={agents}
                 initialScope={scope}
                 initialAgentId={selectedAgentId}
-                editingMemory={editingMemory}
+                editingFile={editingFile}
             />
 
             {/* Confirm Delete Modal */}
@@ -294,8 +266,8 @@ export default function MemoryVaultPage() {
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}
                 onConfirm={handleDelete}
-                title="Delete Memory"
-                description={`Are you sure you want to delete "${deletingTitle}"? This action cannot be undone.`}
+                title="Delete Knowledge File"
+                description={`Are you sure you want to delete "${deletingFileName}"? This action cannot be undone.`}
                 isLoading={deleteMutation.isPending}
             />
         </div>
