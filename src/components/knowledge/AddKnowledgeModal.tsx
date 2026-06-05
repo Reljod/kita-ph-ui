@@ -130,6 +130,8 @@ export function AddKnowledgeModal({
                         initiateRes.token
                     );
 
+                    await knowledgeService.completeUpload(initiateRes.file_id);
+
                     f.status = 'completed';
                 } catch (err: any) {
                     console.error(`Failed to upload ${f.file.name}:`, err);

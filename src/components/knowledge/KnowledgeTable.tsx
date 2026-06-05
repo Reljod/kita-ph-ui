@@ -13,8 +13,12 @@ import {
     FileSpreadsheet, 
     File,
     Edit2,
-    MoreHorizontal
+    MoreHorizontal,
+    CheckCircle2,
+    Clock,
+    AlertCircle
 } from 'lucide-react';
+import { FileStatus } from '@/types/knowledge';
 
 interface Props {
     files: FileResponse[];
@@ -60,6 +64,7 @@ export function KnowledgeTable({ files, onDelete, onEdit }: Props) {
                         <tr className="bg-slate-50/50 border-b border-slate-100">
                             <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">File Name</th>
                             <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Scope</th>
+                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
                             <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Size</th>
                             <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Upload Date</th>
                             <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Actions</th>
@@ -91,6 +96,20 @@ export function KnowledgeTable({ files, onDelete, onEdit }: Props) {
                                     >
                                         {file.agent_id ? <User size={10} /> : <Globe size={10} />}
                                         {file.agent_id ? 'Agent' : 'Global'}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight border
+                                        ${file.status === FileStatus.COMPLETED
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                            : file.status === FileStatus.FAILED
+                                                ? 'bg-red-50 text-red-700 border-red-100'
+                                                : 'bg-amber-50 text-amber-700 border-amber-100 animate-pulse'}`}
+                                    >
+                                        {file.status === FileStatus.COMPLETED && <CheckCircle2 size={10} />}
+                                        {file.status === FileStatus.FAILED && <AlertCircle size={10} />}
+                                        {file.status === FileStatus.PENDING && <Clock size={10} className="animate-spin" />}
+                                        {file.status}
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">

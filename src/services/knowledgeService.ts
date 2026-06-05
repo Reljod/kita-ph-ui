@@ -39,5 +39,9 @@ export const knowledgeService = {
     update: async (id: string, data: FileUpdateRequest): Promise<FileResponse> => {
         const response = await api.patch(`/files/${id}`, data);
         return response.data;
+    },
+
+    completeUpload: async (id: string): Promise<void> => {
+        await api.post(`/files/${id}/complete`);
     }
 };

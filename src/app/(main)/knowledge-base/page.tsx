@@ -7,7 +7,7 @@ import { knowledgeService } from '@/services/knowledgeService';
 import { KnowledgeCard } from '@/components/knowledge/KnowledgeCard';
 import { AddKnowledgeModal } from '@/components/knowledge/AddKnowledgeModal';
 import { Agent } from '@/types/agents';
-import { FileResponse } from '@/types/knowledge';
+import { FileResponse, FileStatus } from '@/types/knowledge';
 import { Plus, Search, User, Globe, Loader2, BookOpen, List, LayoutGrid } from 'lucide-react';
 import { KnowledgeTable } from '@/components/knowledge/KnowledgeTable';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
@@ -50,6 +50,10 @@ export default function KnowledgeBasePage() {
         queryKey: ['knowledge', scope, selectedAgentId],
         queryFn: () => knowledgeService.getAll(scope === 'agent' ? selectedAgentId : undefined),
         enabled: scope === 'org' || !!selectedAgentId,
+        refetchInterval: (query) => {
+            const files = query.state.data as FileResponse[];
+            return files?.some(f => f.status === FileStatus.PENDING) ? 3000 : false;
+        }
     });
 
     // Handle Search locally

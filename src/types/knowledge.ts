@@ -1,3 +1,9 @@
+export enum FileStatus {
+    PENDING = 'pending',
+    COMPLETED = 'completed',
+    FAILED = 'failed'
+}
+
 export interface FileResponse {
     id: string;
     filename: string;
@@ -7,6 +13,7 @@ export interface FileResponse {
     org_id: string;
     agent_id?: string;
     metadata?: Record<string, any>;
+    status: FileStatus;
     created_at: string;
     updated_at: string;
 }

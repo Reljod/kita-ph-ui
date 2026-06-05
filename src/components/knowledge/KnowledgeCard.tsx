@@ -1,7 +1,8 @@
 'use client';
 
 import { FileResponse } from '@/types/knowledge';
-import { User, Globe, Trash2, Calendar, Database, FileText, FileImage, FileCode, FileSpreadsheet, File } from 'lucide-react';
+import { User, Globe, Trash2, Calendar, Database, FileText, FileImage, FileCode, FileSpreadsheet, File, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { FileStatus } from '@/types/knowledge';
 
 interface Props {
     file: FileResponse;
@@ -71,6 +72,22 @@ export function KnowledgeCard({ file, onDelete }: Props) {
                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                     {file.extension || 'FILE'}
                 </span>
+            </div>
+
+            {/* Status Badge */}
+            <div className="mb-4">
+                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight border
+                    ${file.status === FileStatus.COMPLETED
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                        : file.status === FileStatus.FAILED
+                            ? 'bg-red-50 text-red-700 border-red-100'
+                            : 'bg-amber-50 text-amber-700 border-amber-100 animate-pulse'}`}
+                >
+                    {file.status === FileStatus.COMPLETED && <CheckCircle2 size={10} />}
+                    {file.status === FileStatus.FAILED && <AlertCircle size={10} />}
+                    {file.status === FileStatus.PENDING && <Clock size={10} className="animate-spin" />}
+                    {file.status}
+                </div>
             </div>
 
             {/* Content */}
