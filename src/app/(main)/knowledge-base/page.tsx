@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { knowledgeService } from '@/services/knowledgeService';
@@ -10,14 +10,18 @@ import { Agent } from '@/types/agents';
 import { FileResponse } from '@/types/knowledge';
 import { Plus, Search, User, Globe, Loader2, BookOpen, List, LayoutGrid } from 'lucide-react';
 import { KnowledgeTable } from '@/components/knowledge/KnowledgeTable';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 export default function KnowledgeBasePage() {
     const queryClient = useQueryClient();
-    const [scope, setScope] = useState<'agent' | 'org'>('agent');
+    const [scope, setScope] = useState<'agent' | 'org'>('org');
     const [selectedAgentId, setSelectedAgentId] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [deletingFileName, setDeletingFileName] = useState<string>('');
     const [editingFile, setEditingFile] = useState<FileResponse | null>(null);
 
     // Fetch Agents
@@ -27,15 +31,19 @@ export default function KnowledgeBasePage() {
             try {
                 const res = await api.get('/agent');
                 const data = res.data ?? [];
-                if (data.length > 0 && !selectedAgentId) {
-                    setSelectedAgentId(data[0].id);
-                }
                 return data;
             } catch {
                 return [];
             }
         },
     });
+
+    // Handle initial agent selection
+    useEffect(() => {
+        if (agents.length > 0 && !selectedAgentId) {
+            setSelectedAgentId(agents[0].id);
+        }
+    }, [agents, selectedAgentId]);
 
     // Fetch Knowledge Files
     const { data: files = [], isLoading } = useQuery<FileResponse[]>({
@@ -59,8 +67,22 @@ export default function KnowledgeBasePage() {
         mutationFn: (id: string) => knowledgeService.delete(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['knowledge'] });
+            setIsDeleteModalOpen(false);
+            setDeletingId(null);
         },
     });
+
+    const confirmDelete = (id: string, filename: string) => {
+        setDeletingId(id);
+        setDeletingFileName(filename);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDelete = () => {
+        if (deletingId) {
+            deleteMutation.mutate(deletingId);
+        }
+    };
 
     const handleAddClick = () => {
         setEditingFile(null);
@@ -185,14 +207,17 @@ export default function KnowledgeBasePage() {
                                 <KnowledgeCard
                                     key={file.id}
                                     file={file}
-                                    onDelete={(id) => deleteMutation.mutate(id)}
+                                    onDelete={(id) => confirmDelete(id, file.filename)}
                                 />
                             ))}
                         </div>
                     ) : (
                         <KnowledgeTable 
                             files={filteredFiles} 
-                            onDelete={(id) => deleteMutation.mutate(id)}
+                            onDelete={(id) => {
+                                const file = files.find(f => f.id === id);
+                                confirmDelete(id, file?.filename || 'this file');
+                            }}
                             onEdit={handleEditClick}
                         />
                     )
@@ -230,6 +255,16 @@ export default function KnowledgeBasePage() {
                 initialScope={scope}
                 initialAgentId={selectedAgentId}
                 editingFile={editingFile}
+            />
+
+            {/* Confirm Delete Modal */}
+            <ConfirmDialog
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={handleDelete}
+                title="Delete Knowledge File"
+                description={`Are you sure you want to delete "${deletingFileName}"? This action cannot be undone.`}
+                isLoading={deleteMutation.isPending}
             />
         </div>
     );

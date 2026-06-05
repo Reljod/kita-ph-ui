@@ -67,7 +67,7 @@ export function KnowledgeTable({ files, onDelete, onEdit }: Props) {
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                         {files.map((file) => (
-                            <tr key={file.id} className="hover:bg-slate-50/80 group">
+                            <tr key={file.id} className="hover:bg-slate-50/80 group cursor-pointer" onClick={() => onEdit(file)}>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100 group-hover:bg-white transition-colors">
@@ -108,14 +108,14 @@ export function KnowledgeTable({ files, onDelete, onEdit }: Props) {
                                     <div className="relative flex items-center justify-end">
                                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button 
-                                            onClick={() => onEdit(file)}
+                                            onClick={(e) => { e.stopPropagation(); onEdit(file); }}
                                             className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                                             title="Edit metadata"
                                         >
                                             <Edit2 size={16} />
                                         </button>
                                         <button 
-                                            onClick={() => onDelete(file.id)}
+                                            onClick={(e) => { e.stopPropagation(); onDelete(file.id); }}
                                             className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                                             title="Delete file"
                                         >

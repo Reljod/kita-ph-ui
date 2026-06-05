@@ -10,15 +10,20 @@ import { Agent } from '@/types/agents';
 import { RagResponse, RagCreateRequest, RagUpdateRequest } from '@/types/memory';
 import { Plus, Search, User, Globe, Loader2, BrainCircuit, List, LayoutGrid } from 'lucide-react';
 import { MemoryTable } from '@/components/memory/MemoryTable';
+import { useEffect } from 'react';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 export default function MemoryVaultPage() {
     const queryClient = useQueryClient();
-    const [scope, setScope] = useState<'agent' | 'org'>('agent');
+    const [scope, setScope] = useState<'agent' | 'org'>('org');
     const [selectedAgentId, setSelectedAgentId] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingMemory, setEditingMemory] = useState<RagResponse | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [deletingTitle, setDeletingTitle] = useState<string>('');
 
     // Fetch Agents
     const { data: agents = [] } = useQuery<Agent[]>({
@@ -27,15 +32,19 @@ export default function MemoryVaultPage() {
             try {
                 const res = await api.get('/agent');
                 const data = res.data ?? [];
-                if (data.length > 0 && !selectedAgentId) {
-                    setSelectedAgentId(data[0].id);
-                }
                 return data;
             } catch {
                 return [];
             }
         },
     });
+
+    // Handle initial agent selection
+    useEffect(() => {
+        if (agents.length > 0 && !selectedAgentId) {
+            setSelectedAgentId(agents[0].id);
+        }
+    }, [agents, selectedAgentId]);
 
     // Fetch Memories
     const { data: memories = [], isLoading } = useQuery<RagResponse[]>({
@@ -74,8 +83,22 @@ export default function MemoryVaultPage() {
         mutationFn: (id: string) => memoryService.delete(id, scope === 'agent' ? selectedAgentId : undefined),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['memories'] });
+            setIsDeleteModalOpen(false);
+            setDeletingId(null);
         },
     });
+
+    const confirmDelete = (id: string, title: string) => {
+        setDeletingId(id);
+        setDeletingTitle(title);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDelete = () => {
+        if (deletingId) {
+            deleteMutation.mutate(deletingId);
+        }
+    };
 
     const handleAddClick = () => {
         setEditingMemory(null);
@@ -215,7 +238,7 @@ export default function MemoryVaultPage() {
                                 <MemoryCard
                                     key={memory.id}
                                     memory={memory}
-                                    onDelete={(id) => deleteMutation.mutate(id)}
+                                    onDelete={(id) => confirmDelete(id, memory.title)}
                                     onEdit={handleEditClick}
                                 />
                             ))}
@@ -223,7 +246,10 @@ export default function MemoryVaultPage() {
                     ) : (
                         <MemoryTable 
                             memories={filteredMemories} 
-                            onDelete={(id) => deleteMutation.mutate(id)}
+                            onDelete={(id) => {
+                                const memory = memories.find(m => m.id === id);
+                                confirmDelete(id, memory?.title || 'this memory');
+                            }}
                             onEdit={handleEditClick}
                         />
                     )
@@ -261,6 +287,16 @@ export default function MemoryVaultPage() {
                 initialScope={scope}
                 initialAgentId={selectedAgentId}
                 editingMemory={editingMemory}
+            />
+
+            {/* Confirm Delete Modal */}
+            <ConfirmDialog
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={handleDelete}
+                title="Delete Memory"
+                description={`Are you sure you want to delete "${deletingTitle}"? This action cannot be undone.`}
+                isLoading={deleteMutation.isPending}
             />
         </div>
     );
