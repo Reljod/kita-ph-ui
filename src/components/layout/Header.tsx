@@ -1,18 +1,20 @@
 'use client';
 
 import { useAuthStore } from '@/store/useAuthStore';
-import { LogOut, User as UserIcon } from 'lucide-react';
+import { LogOut, User as UserIcon, Sun, Moon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { useSidebarStore } from '@/store/useSidebarStore';
+import { useTheme } from '@/components/ThemeProvider';
 
 export function Header() {
     const { user, logout } = useAuthStore();
     const router = useRouter();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const { toggle: toggleSidebar } = useSidebarStore();
+    const { theme, toggleTheme } = useTheme();
 
     const handleLogout = () => {
         logout();
@@ -51,7 +53,15 @@ export function Header() {
                     </Link>
                 </div>
 
-                <div className="flex items-center gap-4 relative">
+                <div className="flex items-center gap-3 relative">
+                    <button
+                        onClick={toggleTheme}
+                        className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-center"
+                        aria-label="Toggle theme"
+                    >
+                        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                    </button>
+
                     <button
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
                         className="flex items-center gap-3 p-1 pr-3 rounded-full hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all"
