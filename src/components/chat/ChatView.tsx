@@ -9,6 +9,7 @@ import { ChatHistorySidebar } from './ChatHistorySidebar';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { ChevronRight, ArrowLeftRight } from 'lucide-react';
+import Cookies from 'js-cookie';
 
 interface Props {
     agent: Agent;
@@ -46,8 +47,53 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [inputValue, setInputValue] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [currentStatus, setCurrentStatus] = useState<string | null>(null);
+    const [statusKey, setStatusKey] = useState<string | null>(null);
     const [switcherOpen, setSwitcherOpen] = useState(false);
     const switcherRef = useRef<HTMLDivElement>(null);
+
+    // WebSocket logic for real-time status updates
+    useEffect(() => {
+        if (!isTyping || !statusKey) {
+            setCurrentStatus(null);
+            return;
+        }
+
+        let socket: WebSocket | null = null;
+        try {
+            const token = Cookies.get('token');
+            let baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            if (baseUrl.startsWith('/')) {
+                baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+            }
+            const wsUrl = `${baseUrl.replace(/^http/, 'ws')}/chat/status/ws/${statusKey}?token=${encodeURIComponent(token || '')}`;
+
+            socket = new WebSocket(wsUrl);
+
+            socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data && data.current_message) {
+                        setCurrentStatus(data.current_message);
+                    }
+                } catch (err) {
+                    console.error('Error parsing WebSocket message:', err);
+                }
+            };
+
+            socket.onerror = (err) => {
+                console.error('Status WebSocket error:', err);
+            };
+        } catch (err) {
+            console.error('Failed to connect to status WebSocket:', err);
+        }
+
+        return () => {
+            if (socket) {
+                socket.close();
+            }
+        };
+    }, [isTyping, statusKey]);
 
     // Sync chats and messages state when props change (revalidation)
     useEffect(() => {
@@ -108,12 +154,16 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
         };
         setMessages((prev) => [...prev, optimisticMsg]);
 
+        const currentStatusKey = crypto.randomUUID();
+        setStatusKey(currentStatusKey);
+
         try {
             let res;
+            const headers = { 'x-status-key': currentStatusKey };
             if (activeChatId) {
-                res = await api.post(`/agent/${agent.id}/chat/${activeChatId}/continue`, { message: userText });
+                res = await api.post(`/agent/${agent.id}/chat/${activeChatId}/continue`, { message: userText }, { headers });
             } else {
-                res = await api.post(`/agent/${agent.id}/chat`, { message: userText });
+                res = await api.post(`/agent/${agent.id}/chat`, { message: userText }, { headers });
             }
 
             const chatData = res.data;
@@ -138,6 +188,8 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
             ]);
         } finally {
             setIsTyping(false);
+            setStatusKey(null);
+            setCurrentStatus(null);
         }
     };
 
@@ -222,7 +274,7 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
                 </div>
 
                 {/* Independently scrollable messages area */}
-                <ChatMessages messages={messages} isTyping={isTyping} agent={agent} />
+                <ChatMessages messages={messages} isTyping={isTyping} currentStatus={currentStatus} agent={agent} />
 
                 {/* Fixed input at bottom */}
                 <ChatInput

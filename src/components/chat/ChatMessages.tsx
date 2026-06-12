@@ -8,10 +8,11 @@ import { useEffect, useRef } from 'react';
 interface Props {
     messages: Message[];
     isTyping: boolean;
+    currentStatus?: string | null;
     agent: Agent;
 }
 
-export function ChatMessages({ messages, isTyping, agent }: Props) {
+export function ChatMessages({ messages, isTyping, currentStatus, agent }: Props) {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -57,10 +58,22 @@ export function ChatMessages({ messages, isTyping, agent }: Props) {
                             : <User size={20} />
                         }
                     </div>
-                    <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-sm p-4 shadow-sm flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-sm p-4 shadow-sm flex items-center min-h-[50px]">
+                        {currentStatus ? (
+                            <p
+                                className="text-slate-500 italic text-[14px] leading-relaxed"
+                                dangerouslySetInnerHTML={{
+                                    __html: currentStatus.replace(/\*(.*?)\*/g, '<strong class="font-semibold text-slate-700">$1</strong>') +
+                                            '<span class="animate-blink font-bold text-indigo-500 ml-0.5">...</span>'
+                                }}
+                            />
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
