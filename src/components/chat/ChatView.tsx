@@ -9,6 +9,7 @@ import { ChatHistorySidebar } from './ChatHistorySidebar';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { ChevronRight, ArrowLeftRight } from 'lucide-react';
+import Cookies from 'js-cookie';
 
 interface Props {
     agent: Agent;
@@ -46,8 +47,53 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [inputValue, setInputValue] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [currentStatus, setCurrentStatus] = useState<string | null>(null);
+    const [statusKey, setStatusKey] = useState<string | null>(null);
     const [switcherOpen, setSwitcherOpen] = useState(false);
     const switcherRef = useRef<HTMLDivElement>(null);
+
+    // WebSocket logic for real-time status updates
+    useEffect(() => {
+        if (!isTyping || !statusKey) {
+            setCurrentStatus(null);
+            return;
+        }
+
+        let socket: WebSocket | null = null;
+        try {
+            const token = Cookies.get('token');
+            let baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            if (baseUrl.startsWith('/')) {
+                baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+            }
+            const wsUrl = `${baseUrl.replace(/^http/, 'ws')}/chat/status/ws/${statusKey}?token=${encodeURIComponent(token || '')}`;
+
+            socket = new WebSocket(wsUrl);
+
+            socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data && data.current_message) {
+                        setCurrentStatus(data.current_message);
+                    }
+                } catch (err) {
+                    console.error('Error parsing WebSocket message:', err);
+                }
+            };
+
+            socket.onerror = (err) => {
+                console.error('Status WebSocket error:', err);
+            };
+        } catch (err) {
+            console.error('Failed to connect to status WebSocket:', err);
+        }
+
+        return () => {
+            if (socket) {
+                socket.close();
+            }
+        };
+    }, [isTyping, statusKey]);
 
     // Sync chats and messages state when props change (revalidation)
     useEffect(() => {
@@ -108,36 +154,115 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
         };
         setMessages((prev) => [...prev, optimisticMsg]);
 
+        const currentStatusKey = crypto.randomUUID();
+        setStatusKey(currentStatusKey);
+
+        const agentMessageId = crypto.randomUUID();
+        let agentMessageText = '';
+
+        // Add optimistic placeholder for the agent message
+        setMessages((prev) => [
+            ...prev,
+            {
+                id: agentMessageId,
+                role: 'agent',
+                content: '',
+                streaming: true,
+            },
+        ]);
+
         try {
-            let res;
-            if (activeChatId) {
-                res = await api.post(`/agent/${agent.id}/chat/${activeChatId}/continue`, { message: userText });
-            } else {
-                res = await api.post(`/agent/${agent.id}/chat`, { message: userText });
+            const token = Cookies.get('token');
+            const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const url = activeChatId
+                ? `${baseURL}/agent/${agent.id}/chat/${activeChatId}/continue`
+                : `${baseURL}/agent/${agent.id}/chat`;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'x-status-key': currentStatusKey,
+                },
+                body: JSON.stringify({ message: userText }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const chatData = res.data;
-            const newChatId: string = chatData.id ?? activeChatId;
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+            if (!reader) throw new Error('No reader available for response body');
 
-            if (!activeChatId && newChatId) {
-                setActiveChatId(newChatId);
-                // Use router.replace with scroll: false to prevent jumps
-                router.replace(`/agents/${agent.id}/chat/${newChatId}`, { scroll: false });
+            let buffer = '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
 
-                // Invalidate the chat list query (which is part of our consolidated query key)
-                queryClient.invalidateQueries({ queryKey: ['agent-chat-data', agent.id] });
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    const cleanedLine = line.trim();
+                    if (cleanedLine.startsWith('data: ')) {
+                        const dataStr = cleanedLine.slice(6);
+                        try {
+                            const parsedData = JSON.parse(dataStr);
+                            if (parsedData.type === 'content') {
+                                agentMessageText += parsedData.delta;
+                                setMessages((prev) =>
+                                    prev.map((m) =>
+                                        m.id === agentMessageId ? { ...m, content: agentMessageText, streaming: true } : m
+                                    )
+                                );
+                            } else if (parsedData.type === 'reset') {
+                                agentMessageText = '';
+                                setMessages((prev) =>
+                                    prev.map((m) =>
+                                        m.id === agentMessageId ? { ...m, content: '', streaming: true } : m
+                                    )
+                                );
+                            } else if (parsedData.type === 'done') {
+                                const chatData = parsedData.chat;
+                                const newChatId: string = chatData.id ?? activeChatId;
+
+                                // Invalidate the chats list sidebar query
+                                queryClient.invalidateQueries({ queryKey: ['agent-chats', agent.id] });
+
+                                if (!activeChatId && newChatId) {
+                                    setActiveChatId(newChatId);
+                                    router.replace(`/agents/${agent.id}/chat/${newChatId}`, { scroll: false });
+                                }
+
+                                const parsed = parseBackendMessages(chatData.messages ?? []);
+                                queryClient.setQueryData(['chat-messages', agent.id, newChatId], parsed);
+                                setMessages(parsed);
+                            } else if (parsedData.type === 'error') {
+                                throw new Error(parsedData.message);
+                            }
+                        } catch (err) {
+                            console.error('Failed to parse SSE stream chunk:', err, cleanedLine);
+                        }
+                    }
+                }
             }
-
-            const parsed = parseBackendMessages(chatData.messages ?? []);
-            setMessages(parsed);
         } catch (err) {
             console.error('Failed to send message:', err);
-            setMessages((prev) => [
-                ...prev,
-                { id: crypto.randomUUID(), role: 'agent', content: 'Sorry, I encountered an error. Please try again.' } as Message,
-            ]);
+            // Replace placeholder or append error message
+            setMessages((prev) =>
+                prev.map((m) =>
+                    m.id === agentMessageId
+                        ? { ...m, content: 'Sorry, I encountered an error. Please try again.', streaming: false }
+                        : m
+                )
+            );
         } finally {
             setIsTyping(false);
+            setStatusKey(null);
+            setCurrentStatus(null);
         }
     };
 
@@ -222,7 +347,7 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
                 </div>
 
                 {/* Independently scrollable messages area */}
-                <ChatMessages messages={messages} isTyping={isTyping} agent={agent} />
+                <ChatMessages messages={messages} isTyping={isTyping} currentStatus={currentStatus} agent={agent} />
 
                 {/* Fixed input at bottom */}
                 <ChatInput

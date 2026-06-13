@@ -305,3 +305,16 @@
   --indigo-800: #c25940;
   --indigo-900: #9e442f;
 }
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-blink {
+  animation: blink 1.4s infinite both;
+}

@@ -8,10 +8,11 @@ import { useEffect, useRef } from 'react';
 interface Props {
     messages: Message[];
     isTyping: boolean;
+    currentStatus?: string | null;
     agent: Agent;
 }
 
-export function ChatMessages({ messages, isTyping, agent }: Props) {
+export function ChatMessages({ messages, isTyping, currentStatus, agent }: Props) {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -20,7 +21,7 @@ export function ChatMessages({ messages, isTyping, agent }: Props) {
 
     return (
         <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6">
-            {messages.map((msg) => (
+            {messages.filter(msg => msg.content.trim() !== '').map((msg) => (
                 <div
                     key={msg.id}
                     className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
@@ -36,13 +37,20 @@ export function ChatMessages({ messages, isTyping, agent }: Props) {
                         )}
                     </div>
 
-                    <div className={`max-w-[75%] rounded-2xl p-4 shadow-sm text-[15px] leading-relaxed ${msg.role === 'user'
-                        ? 'bg-indigo-600 text-white rounded-tr-sm'
-                        : 'bg-white border border-slate-100 text-slate-700 rounded-tl-sm'
+                    <div className={`rounded-2xl shadow-sm text-[15px] leading-relaxed ${msg.role === 'user'
+                        ? 'max-w-[75%] p-4 bg-indigo-600 text-white rounded-tr-sm'
+                        : msg.streaming
+                            ? 'max-w-[60%] p-3 bg-slate-50/85 border border-slate-100/80 text-slate-400 italic rounded-tl-sm'
+                            : 'max-w-[75%] p-4 bg-white border border-slate-100 text-slate-700 rounded-tl-sm'
                         }`}>
                         <MarkdownRenderer
                             content={msg.content}
-                            className={msg.role === 'user' ? 'prose-invert text-white/95' : 'text-slate-700'}
+                            className={msg.role === 'user'
+                                ? 'prose-invert text-white/95'
+                                : msg.streaming
+                                    ? 'text-slate-400 italic'
+                                    : 'text-slate-700'
+                            }
                         />
                     </div>
                 </div>
@@ -57,10 +65,22 @@ export function ChatMessages({ messages, isTyping, agent }: Props) {
                             : <User size={20} />
                         }
                     </div>
-                    <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-sm p-4 shadow-sm flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-sm p-4 shadow-sm flex items-center min-h-[50px]">
+                        {currentStatus ? (
+                            <p
+                                className="text-slate-500 italic text-[14px] leading-relaxed"
+                                dangerouslySetInnerHTML={{
+                                    __html: currentStatus.replace(/\*(.*?)\*/g, '<strong class="font-semibold text-slate-700">$1</strong>') +
+                                            '<span class="animate-blink font-bold text-indigo-500 ml-0.5">...</span>'
+                                }}
+                            />
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
