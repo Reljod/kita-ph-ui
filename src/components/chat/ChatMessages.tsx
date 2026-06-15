@@ -56,13 +56,14 @@ export function ChatMessages({ messages, isTyping, currentStatus, agent }: Props
                         </div>
                         <div className="bg-slate-50 border border-slate-100/80 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm flex items-center min-h-[40px]">
                             {currentStatus ? (
-                                <p
-                                    className="text-slate-400 italic text-[13.5px] leading-relaxed"
-                                    dangerouslySetInnerHTML={{
-                                        __html: currentStatus.replace(/\*(.*?)\*/g, '<strong class="font-semibold text-slate-500">$1</strong>') +
-                                                '<span class="animate-blink font-bold text-indigo-400 ml-0.5">...</span>'
-                                    }}
-                                />
+                                <p className="text-slate-400 italic text-[13.5px] leading-relaxed">
+                                    {currentStatus.split(/\*(.*?)\*/g).map((part, i) =>
+                                        i % 2 === 1
+                                            ? <strong key={i} className="font-semibold text-slate-500">{part}</strong>
+                                            : <span key={i}>{part}</span>
+                                    )}
+                                    <span className="animate-blink font-bold text-indigo-400 ml-0.5">...</span>
+                                </p>
                             ) : (
                                 <div className="flex items-center gap-2">
                                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-300 animate-bounce" style={{ animationDelay: '0ms' }} />

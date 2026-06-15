@@ -43,7 +43,7 @@ export function parseBackendMessages(backendMessages: any[]): Message[] {
 
             return {
                 id: `${msg.id || msg.run_id || crypto.randomUUID()}-${msg.kind}-${index}`,
-                role: (msg.kind === 'request' ? 'user' : 'agent') as 'user' | 'agent' | 'builder',
+                role: (msg.kind === 'request' ? 'user' : msg.kind === 'builder' ? 'builder' : 'agent') as 'user' | 'agent' | 'builder',
                 content,
                 thinking: thinking || undefined,
             };
@@ -264,7 +264,7 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
                                 agentMessageText = '';
                                 setMessages((prev) =>
                                     prev.map((m) =>
-                                        m.id === agentMessageId ? { ...m, content: '', streaming: true } : m
+                                        m.id === agentMessageId ? { ...m, content: '', thinking: '', streaming: true } : m
                                     )
                                 );
                             } else if (parsedData.type === 'done') {
