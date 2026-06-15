@@ -3,6 +3,7 @@ export interface Message {
     role: 'user' | 'agent' | 'builder';
     content: string;
     streaming?: boolean;
+    thinking?: string;
 }
 
 export interface ChatItem {

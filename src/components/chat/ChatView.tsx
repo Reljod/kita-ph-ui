@@ -19,23 +19,59 @@ interface Props {
     initialMessages: Message[];
 }
 
-function parseBackendMessages(backendMessages: any[]): Message[] {
-    return backendMessages
+export function parseBackendMessages(backendMessages: any[]): Message[] {
+    const rawMessages = backendMessages
         .map((msg: any, index: number) => {
+            const isAgent = msg.kind !== 'request';
+            const hasToolCalls = isAgent && msg.parts && msg.parts.some((part: any) => part.part_kind === 'tool-call');
+
+            // If it is an agent message and has tool calls, any 'text' part is an intermediate response before tool execution.
+            // Move such text parts into 'thinking' instead of 'content'.
+            const contentParts = msg.parts
+                ? msg.parts.filter((part: any) => part.part_kind === 'user-prompt' || (part.part_kind === 'text' && !hasToolCalls))
+                : [];
             const content = msg.parts
-                ? msg.parts
-                    .filter((part: any) => part.part_kind === 'user-prompt' || part.part_kind === 'text')
-                    .map((part: any) => part.content)
-                    .join('\n')
+                ? contentParts.map((part: any) => part.content).join('\n')
                 : msg.content || '';
+
+            const thinkingParts = msg.parts
+                ? msg.parts.filter((part: any) => part.part_kind === 'thinking' || (part.part_kind === 'text' && hasToolCalls))
+                : [];
+            const thinking = msg.parts
+                ? thinkingParts.map((part: any) => part.content).join('\n')
+                : undefined;
 
             return {
                 id: `${msg.id || msg.run_id || crypto.randomUUID()}-${msg.kind}-${index}`,
-                role: (msg.kind === 'request' ? 'user' : 'agent') as 'user' | 'agent',
+                role: (msg.kind === 'request' ? 'user' : 'agent') as 'user' | 'agent' | 'builder',
                 content,
+                thinking: thinking || undefined,
             };
         })
-        .filter((msg) => msg.content.trim() !== '');
+        .filter((msg) => msg.content.trim() !== '' || (msg.thinking && msg.thinking.trim() !== ''));
+
+    // Merge consecutive messages with the same role
+    const merged: Message[] = [];
+    for (const msg of rawMessages) {
+        const last = merged[merged.length - 1];
+        if (last && last.role === msg.role) {
+            // Merge content
+            if (msg.content.trim()) {
+                last.content = last.content 
+                    ? `${last.content}\n${msg.content}` 
+                    : msg.content;
+            }
+            // Merge thinking
+            if (msg.thinking?.trim()) {
+                last.thinking = last.thinking 
+                    ? `${last.thinking}\n${msg.thinking}` 
+                    : msg.thinking;
+            }
+        } else {
+            merged.push({ ...msg });
+        }
+    }
+    return merged;
 }
 
 export function ChatView({ agent, allAgents = [], initialChatId, initialChats, initialMessages }: Props) {
@@ -218,6 +254,12 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
                                         m.id === agentMessageId ? { ...m, content: agentMessageText, streaming: true } : m
                                     )
                                 );
+                            } else if (parsedData.type === 'thought') {
+                                setMessages((prev) =>
+                                    prev.map((m) =>
+                                        m.id === agentMessageId ? { ...m, thinking: (m.thinking ?? '') + parsedData.delta, streaming: true } : m
+                                    )
+                                );
                             } else if (parsedData.type === 'reset') {
                                 agentMessageText = '';
                                 setMessages((prev) =>
@@ -263,6 +305,9 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
             setIsTyping(false);
             setStatusKey(null);
             setCurrentStatus(null);
+            setMessages((prev) =>
+                prev.map((m) => m.streaming ? { ...m, streaming: false } : m)
+            );
         }
     };
 
