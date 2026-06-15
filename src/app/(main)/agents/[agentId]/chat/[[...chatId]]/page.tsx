@@ -4,26 +4,9 @@ import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Agent, ChatItem, Message } from '@/types/agents';
-import { ChatView } from '@/components/chat/ChatView';
+import { ChatView, parseBackendMessages } from '@/components/chat/ChatView';
 import { Loader2 } from 'lucide-react';
 
-function parseBackendMessages(backendMessages: any[]): Message[] {
-    return backendMessages
-        .map((msg: any, index: number) => {
-            const content = msg.parts
-                ? msg.parts
-                    .filter((part: any) => part.part_kind === 'user-prompt' || part.part_kind === 'text')
-                    .map((part: any) => part.content)
-                    .join('\n')
-                : msg.content || '';
-            return {
-                id: `${msg.id || msg.run_id || crypto.randomUUID()}-${msg.kind}-${index}`,
-                role: (msg.kind === 'request' ? 'user' : 'agent') as 'user' | 'agent',
-                content,
-            };
-        })
-        .filter((msg) => msg.content.trim() !== '');
-}
 
 export default function AgentChatPage() {
     const params = useParams();
