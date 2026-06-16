@@ -1,5 +1,6 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { v4 as uuidv4 } from 'uuid';
 
 export const api = axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
@@ -14,6 +15,13 @@ api.interceptors.request.use(
         const token = Cookies.get('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
+        }
+        // Generate correlation tracking headers
+        if (!config.headers['x-request-id']) {
+            config.headers['x-request-id'] = uuidv4();
+        }
+        if (!config.headers['x-trace-id']) {
+            config.headers['x-trace-id'] = uuidv4();
         }
         return config;
     },
