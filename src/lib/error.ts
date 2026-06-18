@@ -1,4 +1,4 @@
-import { AxiosError } from 'axios';
+import { isAxiosError } from 'axios';
 
 export interface ApiErrorResponse {
     error?: {
@@ -103,8 +103,4 @@ export function getFriendlyErrorMessage(err: unknown, context?: 'login' | 'gener
     return `An unexpected error occurred. Please try again later.${
         traceId ? `\n(Trace ID: ${traceId})` : ''
     }`;
-}
-
-function isAxiosError(err: any): err is AxiosError {
-    return err && typeof err === 'object' && 'isAxiosError' in err && err.isAxiosError === true;
 }

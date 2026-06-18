@@ -11,6 +11,8 @@ import { ChatInput } from './ChatInput';
 import { ChevronRight, ArrowLeftRight } from 'lucide-react';
 import Cookies from 'js-cookie';
 import { useAuthStore } from '@/store/useAuthStore';
+import { v4 as uuidv4 } from 'uuid';
+
 
 interface Props {
     agent: Agent;
@@ -221,6 +223,8 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                     'x-status-key': currentStatusKey,
+                    'x-request-id': uuidv4(),
+                    'x-trace-id': uuidv4(),
                 },
                 body: JSON.stringify({ message: userText }),
             });

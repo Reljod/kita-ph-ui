@@ -67,10 +67,12 @@ api.interceptors.response.use(
                     console.error('Token refresh failed:', refreshError);
                     // Clear state and cookies using Zustand auth store
                     useAuthStore.getState().logout();
+                    return;
                 }
             } else {
                 // No refresh token available
                 useAuthStore.getState().logout();
+                return;
             }
         }
         return Promise.reject(error);
