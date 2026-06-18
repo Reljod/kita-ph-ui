@@ -33,9 +33,12 @@ export default function LoginPage() {
                 formData.append('org_code', orgCode);
             }
 
-            const response = await api.post('/auth/login', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
+            // Do NOT manually set Content-Type here.
+            // When set manually, axios omits the required 'boundary' parameter
+            // from the multipart/form-data header, causing Cloudflare to report
+            // "invalid or incomplete response from the origin server".
+            // Letting axios auto-set the header ensures the boundary is included.
+            const response = await api.post('/auth/login', formData);
 
             const data = response.data;
 
