@@ -22,23 +22,21 @@ export default function LoginPage() {
         setError('');
 
         try {
-            // Setup payload based on Kita-API expected OAuth2PasswordRequestForm
-            // In FastAPI with custom fields often it's sent as form-data, but let's assume JSON or standard form.
-            // Kita-API usually expects form-data for standard OAuth2 login.
-            const formData = new FormData();
+            // FastAPI's OAuth2PasswordRequestForm strictly requires
+            // application/x-www-form-urlencoded — NOT multipart/form-data.
+            // URLSearchParams triggers axios to send the correct encoding automatically.
+            const formData = new URLSearchParams();
             formData.append('username', email);
             formData.append('password', password);
-            // Custom Kita-API requirement for org
             if (orgCode) {
                 formData.append('org_code', orgCode);
             }
 
-            // Do NOT manually set Content-Type here.
-            // When set manually, axios omits the required 'boundary' parameter
-            // from the multipart/form-data header, causing Cloudflare to report
-            // "invalid or incomplete response from the origin server".
-            // Letting axios auto-set the header ensures the boundary is included.
-            const response = await api.post('/auth/login', formData);
+            // Must explicitly override the axios instance default (application/json)
+            // so the request is sent as application/x-www-form-urlencoded.
+            const response = await api.post('/auth/login', formData, {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            });
 
             const data = response.data;
 
