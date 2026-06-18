@@ -38,9 +38,14 @@ api.interceptors.response.use(
     },
     async (error) => {
         const originalRequest = error.config;
+        const isAuthRequest = originalRequest.url && (
+            originalRequest.url.includes('/auth/login') ||
+            originalRequest.url.includes('/auth/register') ||
+            originalRequest.url.includes('/auth/refresh')
+        );
 
         // Handle 401 Unauthorized globally
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && !isAuthRequest && !originalRequest._retry) {
             originalRequest._retry = true;
 
             const refreshToken = Cookies.get('refreshToken');
