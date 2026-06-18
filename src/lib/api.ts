@@ -1,6 +1,7 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
 import { v4 as uuidv4 } from 'uuid';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export const api = axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
@@ -59,19 +60,12 @@ api.interceptors.response.use(
                     return api(originalRequest);
                 } catch (refreshError) {
                     console.error('Token refresh failed:', refreshError);
-                    // If refresh fails, clear tokens and redirect to login
-                    Cookies.remove('token');
-                    Cookies.remove('refreshToken');
-                    if (typeof window !== 'undefined') {
-                        window.location.href = '/login';
-                    }
+                    // Clear state and cookies using Zustand auth store
+                    useAuthStore.getState().logout();
                 }
             } else {
                 // No refresh token available
-                Cookies.remove('token');
-                if (typeof window !== 'undefined') {
-                    window.location.href = '/login';
-                }
+                useAuthStore.getState().logout();
             }
         }
         return Promise.reject(error);

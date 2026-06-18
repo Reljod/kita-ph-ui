@@ -10,6 +10,7 @@ import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { ChevronRight, ArrowLeftRight } from 'lucide-react';
 import Cookies from 'js-cookie';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface Props {
     agent: Agent;
@@ -223,6 +224,11 @@ export function ChatView({ agent, allAgents = [], initialChatId, initialChats, i
                 },
                 body: JSON.stringify({ message: userText }),
             });
+
+            if (response.status === 401) {
+                useAuthStore.getState().logout();
+                return;
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
