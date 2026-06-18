@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Bot, Loader2, KeyRound } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { api } from '@/lib/api';
+import { getFriendlyErrorMessage } from '@/lib/error';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -51,12 +52,7 @@ export default function LoginPage() {
             router.push('/dashboard');
         } catch (err: unknown) {
             console.error('Login failed:', err);
-            // Typecast for axios error shape
-            const errorObj = err as { response?: { data?: { detail?: string } } };
-            setError(
-                errorObj.response?.data?.detail ||
-                'Login failed. Please check your credentials and organization code.'
-            );
+            setError(getFriendlyErrorMessage(err, 'login'));
         } finally {
             setIsLoading(false);
         }

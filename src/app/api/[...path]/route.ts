@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { v4 as uuidv4 } from 'uuid';
 
 async function handleRequest(request: NextRequest) {
     const { pathname, search } = request.nextUrl;
@@ -21,6 +22,14 @@ async function handleRequest(request: NextRequest) {
     // Securely inject API credentials on the server side
     headers.set('x-api-key', process.env.KITA_API_KEY || '');
     headers.set('x-client-id', process.env.KITA_CLIENT_ID || '');
+
+    // Ensure correlation headers are present, generating UUIDs as fallbacks
+    if (!headers.has('x-request-id')) {
+        headers.set('x-request-id', uuidv4());
+    }
+    if (!headers.has('x-trace-id')) {
+        headers.set('x-trace-id', uuidv4());
+    }
     
     const method = request.method;
     const hasBody = method !== 'GET' && method !== 'HEAD';
