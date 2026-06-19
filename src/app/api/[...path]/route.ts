@@ -42,9 +42,7 @@ async function handleRequest(request: NextRequest) {
         };
         
         if (hasBody) {
-            fetchOptions.body = request.body;
-            // @ts-ignore - duplex is required when body is a ReadableStream in Node.js
-            fetchOptions.duplex = 'half';
+            fetchOptions.body = await request.arrayBuffer();
         }
         
         const response = await fetch(targetUrl.toString(), fetchOptions);
