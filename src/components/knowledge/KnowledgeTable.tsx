@@ -24,9 +24,10 @@ interface Props {
     files: FileResponse[];
     onDelete: (id: string) => void;
     onEdit: (file: FileResponse) => void;
+    onPreview: (file: FileResponse) => void;
 }
 
-export function KnowledgeTable({ files, onDelete, onEdit }: Props) {
+export function KnowledgeTable({ files, onDelete, onEdit, onPreview }: Props) {
     const formatDate = (dateStr: string) => {
         try {
             return new Intl.DateTimeFormat('en-US', {
@@ -72,7 +73,7 @@ export function KnowledgeTable({ files, onDelete, onEdit }: Props) {
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                         {files.map((file) => (
-                            <tr key={file.id} className="hover:bg-slate-50/80 group cursor-pointer" onClick={() => onEdit(file)}>
+                            <tr key={file.id} className="hover:bg-slate-50/80 group cursor-pointer" onClick={() => onPreview(file)}>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100 group-hover:bg-white transition-colors">
