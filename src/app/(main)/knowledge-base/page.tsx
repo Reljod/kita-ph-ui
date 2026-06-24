@@ -10,6 +10,7 @@ import { Agent } from '@/types/agents';
 import { FileResponse, FileStatus } from '@/types/knowledge';
 import { Plus, Search, User, Globe, Loader2, BookOpen, List, LayoutGrid } from 'lucide-react';
 import { KnowledgeTable } from '@/components/knowledge/KnowledgeTable';
+import { FilePreviewModal } from '@/components/knowledge/FilePreviewModal';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 export default function KnowledgeBasePage() {
@@ -23,6 +24,7 @@ export default function KnowledgeBasePage() {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [deletingFileName, setDeletingFileName] = useState<string>('');
     const [editingFile, setEditingFile] = useState<FileResponse | null>(null);
+    const [previewingFile, setPreviewingFile] = useState<FileResponse | null>(null);
 
     // Fetch Agents
     const { data: agents = [] } = useQuery<Agent[]>({
@@ -212,6 +214,7 @@ export default function KnowledgeBasePage() {
                                     key={file.id}
                                     file={file}
                                     onDelete={(id) => confirmDelete(id, file.filename)}
+                                    onPreview={setPreviewingFile}
                                 />
                             ))}
                         </div>
@@ -223,6 +226,7 @@ export default function KnowledgeBasePage() {
                                 confirmDelete(id, file?.filename || 'this file');
                             }}
                             onEdit={handleEditClick}
+                            onPreview={setPreviewingFile}
                         />
                     )
                 ) : (
@@ -259,6 +263,12 @@ export default function KnowledgeBasePage() {
                 initialScope={scope}
                 initialAgentId={selectedAgentId}
                 editingFile={editingFile}
+            />
+
+            {/* File Preview Modal */}
+            <FilePreviewModal
+                file={previewingFile}
+                onClose={() => setPreviewingFile(null)}
             />
 
             {/* Confirm Delete Modal */}

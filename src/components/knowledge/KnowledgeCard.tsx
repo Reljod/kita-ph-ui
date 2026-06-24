@@ -7,9 +7,10 @@ import { FileStatus } from '@/types/knowledge';
 interface Props {
     file: FileResponse;
     onDelete: (id: string) => void;
+    onPreview: (file: FileResponse) => void;
 }
 
-export function KnowledgeCard({ file, onDelete }: Props) {
+export function KnowledgeCard({ file, onDelete, onPreview }: Props) {
     const isAgentScoped = !!file.agent_id;
 
     const formatDate = (dateStr: string) => {
@@ -43,7 +44,8 @@ export function KnowledgeCard({ file, onDelete }: Props) {
 
     return (
         <div
-            className="group relative bg-white border border-slate-200 rounded-3xl p-6 shadow-xl shadow-slate-200/50 transition-all duration-300 hover:border-indigo-200 hover:shadow-indigo-100/50 flex flex-col h-full cursor-default"
+            className="group relative bg-white border border-slate-200 rounded-3xl p-6 shadow-xl shadow-slate-200/50 transition-all duration-300 hover:border-indigo-200 hover:shadow-indigo-100/50 flex flex-col h-full cursor-pointer"
+            onClick={() => onPreview(file)}
         >
             {/* Action Menu - Delete */}
             <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">

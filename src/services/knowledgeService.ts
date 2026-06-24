@@ -43,5 +43,12 @@ export const knowledgeService = {
 
     completeUpload: async (id: string): Promise<void> => {
         await api.post(`/files/${id}/complete`);
-    }
+    },
+
+    getPreview: async (fileId: string): Promise<Blob> => {
+        const response = await api.get(`/files/${fileId}/preview`, {
+            responseType: 'blob',
+        });
+        return response.data;
+    },
 };
