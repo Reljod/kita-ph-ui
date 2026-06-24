@@ -25,9 +25,12 @@ import {
     Globe,
     Database,
     Zap,
-    ArrowRight
+    ArrowRight,
+    Shield
 } from 'lucide-react';
 import { Tool } from '@/types/tools';
+import { useAuthStore } from '@/store/useAuthStore';
+import { organizationService } from '@/services/organizationService';
 import {
     Dialog,
     DialogContent,
@@ -103,6 +106,14 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
         },
     });
 
+    // Fetch Organization for guardrail defaults
+    const { user } = useAuthStore();
+    const { data: org } = useQuery({
+        queryKey: ['organization', user?.org_id],
+        queryFn: () => organizationService.getOrganization(user?.org_id!),
+        enabled: !!user?.org_id,
+    });
+
     // Form State
     const [formData, setFormData] = useState({
         name: '',
@@ -110,6 +121,7 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
         goal: '',
         backstory: '',
         llm_id: '',
+        config: {} as Record<string, any>,
     });
 
     // Combined Memories - De-duplicate by ID just in case
@@ -128,6 +140,7 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
                 goal: agent.goal || '',
                 backstory: agent.backstory || '',
                 llm_id: agent.llm_id || '',
+                config: agent.config || {},
             });
             setPersonalities(agent.personalities || []);
         }
@@ -207,10 +220,17 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
         e.preventDefault();
         setIsSaving(true);
         try {
-            await updateAgentMutation.mutateAsync({
+            const payload: Record<string, any> = {
                 ...formData,
                 personalities,
-            });
+            };
+            const hasConfig = formData.config && Object.keys(formData.config).length > 0;
+            if (hasConfig) {
+                payload.config = formData.config;
+            } else {
+                delete payload.config;
+            }
+            await updateAgentMutation.mutateAsync(payload as any);
         } finally {
             setIsSaving(false);
         }
@@ -415,130 +435,190 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
             </div>
 
             {activeTab === 'details' ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Basic Info */}
-                    <div className="space-y-6 bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                        <div className="flex items-center gap-2 text-indigo-600 mb-2">
-                            <User size={18} />
-                            <h2 className="font-bold uppercase tracking-wider text-xs">Identity</h2>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Agent Name</label>
-                            <input
-                                type="text"
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                disabled={readOnly}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 disabled:opacity-70"
-                                placeholder="e.g. Research Assistant"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Role / Persona</label>
-                            <input
-                                type="text"
-                                value={formData.role}
-                                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                                disabled={readOnly}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 disabled:opacity-70"
-                                placeholder="e.g. Expert in market analysis"
-                            />
-                        </div>
-
-                        <div>
-                            <div className="flex items-center gap-2 text-indigo-600 mt-8 mb-4">
-                                <Cpu size={18} />
-                                <h2 className="font-bold uppercase tracking-wider text-xs">LLM Configuration</h2>
+                <div className="space-y-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Basic Info */}
+                        <div className="space-y-6 bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                                <User size={18} />
+                                <h2 className="font-bold uppercase tracking-wider text-xs">Identity</h2>
                             </div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Selected Model</label>
-                            <select
-                                value={formData.llm_id}
-                                onChange={(e) => setFormData({ ...formData, llm_id: e.target.value })}
-                                disabled={readOnly}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 appearance-none disabled:opacity-70"
-                            >
-                                <option value="">Select a model...</option>
-                                {llms.map((llm) => (
-                                    <option key={llm.id} value={llm.id}>
-                                        {llm.name} ({llm.provider})
-                                    </option>
-                                ))}
-                            </select>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Agent Name</label>
+                                <input
+                                    type="text"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    disabled={readOnly}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 disabled:opacity-70"
+                                    placeholder="e.g. Research Assistant"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Role / Persona</label>
+                                <input
+                                    type="text"
+                                    value={formData.role}
+                                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                    disabled={readOnly}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 disabled:opacity-70"
+                                    placeholder="e.g. Expert in market analysis"
+                                />
+                            </div>
+
+                            <div>
+                                <div className="flex items-center gap-2 text-indigo-600 mt-8 mb-4">
+                                    <Cpu size={18} />
+                                    <h2 className="font-bold uppercase tracking-wider text-xs">LLM Configuration</h2>
+                                </div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Selected Model</label>
+                                <select
+                                    value={formData.llm_id}
+                                    onChange={(e) => setFormData({ ...formData, llm_id: e.target.value })}
+                                    disabled={readOnly}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 appearance-none disabled:opacity-70"
+                                >
+                                    <option value="">Select a model...</option>
+                                    {llms.map((llm) => (
+                                        <option key={llm.id} value={llm.id}>
+                                            {llm.name} ({llm.provider})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Behavior & Personality */}
+                        <div className="space-y-6">
+                            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                                <div className="flex items-center gap-2 text-indigo-600 mb-4">
+                                    <Target size={18} />
+                                    <h2 className="font-bold uppercase tracking-wider text-xs">Mission & Goal</h2>
+                                </div>
+                                <textarea
+                                    value={formData.goal}
+                                    onChange={(e) => setFormData({ ...formData, goal: e.target.value })}
+                                    disabled={readOnly}
+                                    rows={3}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 resize-none disabled:opacity-70"
+                                    placeholder="What is the primary objective of this agent?"
+                                />
+                            </div>
+
+                            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                                <div className="flex items-center gap-2 text-indigo-600 mb-4">
+                                    <ScrollText size={18} />
+                                    <h2 className="font-bold uppercase tracking-wider text-xs">Backstory</h2>
+                                </div>
+                                <textarea
+                                    value={formData.backstory}
+                                    onChange={(e) => setFormData({ ...formData, backstory: e.target.value })}
+                                    disabled={readOnly}
+                                    rows={4}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 resize-none disabled:opacity-70"
+                                    placeholder="What is the background and experience of this agent?"
+                                />
+                            </div>
+
+                            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                                <div className="flex items-center gap-2 text-indigo-600 mb-4">
+                                    <Sparkles size={18} />
+                                    <h2 className="font-bold uppercase tracking-wider text-xs">Personality Traits</h2>
+                                </div>
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    {personalities.map((p, idx) => (
+                                        <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-semibold">
+                                            {p}
+                                            {!readOnly && (
+                                                <button onClick={() => removePersonality(p)} className="hover:text-indigo-800">
+                                                    <X size={14} />
+                                                </button>
+                                            )}
+                                        </span>
+                                    ))}
+                                    {personalities.length === 0 && (
+                                        <p className="text-sm text-slate-400 italic">No traits added yet.</p>
+                                    )}
+                                </div>
+                                {!readOnly && (
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={newPersonality}
+                                            onChange={(e) => setNewPersonality(e.target.value)}
+                                            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddPersonality())}
+                                            className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all text-sm"
+                                            placeholder="Add a trait (e.g. Friendly)"
+                                        />
+                                        <button
+                                            onClick={(e) => { e.preventDefault(); handleAddPersonality(); }}
+                                            className="p-2 bg-indigo-100 text-indigo-600 rounded-xl hover:bg-indigo-200 transition-all"
+                                        >
+                                            <Plus size={20} />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    {/* Behavior & Personality */}
-                    <div className="space-y-6">
-                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                            <div className="flex items-center gap-2 text-indigo-600 mb-4">
-                                <Target size={18} />
-                                <h2 className="font-bold uppercase tracking-wider text-xs">Mission & Goal</h2>
-                            </div>
-                            <textarea
-                                value={formData.goal}
-                                onChange={(e) => setFormData({ ...formData, goal: e.target.value })}
-                                disabled={readOnly}
-                                rows={3}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 resize-none disabled:opacity-70"
-                                placeholder="What is the primary objective of this agent?"
-                            />
+                    {/* Guardrails Section */}
+                    <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                        <div className="flex items-center gap-2 text-slate-500 mb-6">
+                            <Shield size={18} />
+                            <h2 className="font-bold uppercase tracking-wider text-xs">Guardrails</h2>
                         </div>
-
-                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                            <div className="flex items-center gap-2 text-indigo-600 mb-4">
-                                <ScrollText size={18} />
-                                <h2 className="font-bold uppercase tracking-wider text-xs">Backstory</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-slate-700">
+                                    Max Delegation Depth
+                                </label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={50}
+                                    value={formData.config?.max_delegation_depth ?? ''}
+                                    onChange={(e) => setFormData({
+                                        ...formData,
+                                        config: {
+                                            ...formData.config,
+                                            max_delegation_depth: e.target.value ? parseInt(e.target.value) : undefined,
+                                        }
+                                    })}
+                                    disabled={readOnly}
+                                    placeholder={`Org default: ${org?.config?.max_delegation_depth ?? 5}`}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 disabled:opacity-70"
+                                />
+                                <p className="text-xs text-slate-400">
+                                    Maximum nesting level for agent-to-agent delegation. Empty = use org default.
+                                </p>
                             </div>
-                            <textarea
-                                value={formData.backstory}
-                                onChange={(e) => setFormData({ ...formData, backstory: e.target.value })}
-                                disabled={readOnly}
-                                rows={4}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 resize-none disabled:opacity-70"
-                                placeholder="What is the background and experience of this agent?"
-                            />
-                        </div>
-
-                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                            <div className="flex items-center gap-2 text-indigo-600 mb-4">
-                                <Sparkles size={18} />
-                                <h2 className="font-bold uppercase tracking-wider text-xs">Personality Traits</h2>
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-slate-700">
+                                    Max Web Search Depth
+                                </label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={50}
+                                    value={formData.config?.max_websearch_depth ?? ''}
+                                    onChange={(e) => setFormData({
+                                        ...formData,
+                                        config: {
+                                            ...formData.config,
+                                            max_websearch_depth: e.target.value ? parseInt(e.target.value) : undefined,
+                                        }
+                                    })}
+                                    disabled={readOnly}
+                                    placeholder={`Org default: ${org?.config?.max_websearch_depth ?? 10}`}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 disabled:opacity-70"
+                                />
+                                <p className="text-xs text-slate-400">
+                                    Maximum web search calls per agent run. Empty = use org default.
+                                </p>
                             </div>
-                            <div className="flex flex-wrap gap-2 mb-4">
-                                {personalities.map((p, idx) => (
-                                    <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-semibold">
-                                        {p}
-                                        {!readOnly && (
-                                            <button onClick={() => removePersonality(p)} className="hover:text-indigo-800">
-                                                <X size={14} />
-                                            </button>
-                                        )}
-                                    </span>
-                                ))}
-                                {personalities.length === 0 && (
-                                    <p className="text-sm text-slate-400 italic">No traits added yet.</p>
-                                )}
-                            </div>
-                            {!readOnly && (
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={newPersonality}
-                                        onChange={(e) => setNewPersonality(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddPersonality())}
-                                        className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 rounded-xl outline-none transition-all text-sm"
-                                        placeholder="Add a trait (e.g. Friendly)"
-                                    />
-                                    <button
-                                        onClick={(e) => { e.preventDefault(); handleAddPersonality(); }}
-                                        className="p-2 bg-indigo-100 text-indigo-600 rounded-xl hover:bg-indigo-200 transition-all"
-                                    >
-                                        <Plus size={20} />
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>

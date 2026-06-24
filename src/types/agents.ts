@@ -23,5 +23,6 @@ export interface Agent {
     avatar?: string;
     color?: string;
     tools?: string[];
+    config?: Record<string, any>;
     updated_at?: string;
 }
