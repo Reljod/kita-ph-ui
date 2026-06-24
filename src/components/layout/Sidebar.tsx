@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Bot, X, BrainCircuit, Hammer, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Bot, X, BrainCircuit, Hammer, BookOpen, Settings } from 'lucide-react';
 import { useSidebarStore } from '@/store/useSidebarStore';
 
 const navLinks = [
@@ -11,6 +11,7 @@ const navLinks = [
     { href: '/memory', label: 'Memory Vault', icon: BrainCircuit },
     { href: '/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
     { href: '/tools', label: 'Tools', icon: Hammer },
+    { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function Sidebar() {
