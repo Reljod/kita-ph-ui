@@ -49,8 +49,6 @@ test.describe('Knowledge Base', () => {
 
     // Wait for dialog to close and refetch to complete
     await expect(page.getByText('Delete Knowledge File')).not.toBeVisible();
-    await page.waitForTimeout(1000);
-
     await expect(page.getByText('project_requirements.pdf', { exact: true })).not.toBeVisible();
   });
 });

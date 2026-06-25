@@ -45,7 +45,6 @@ test.describe('Memory Vault', () => {
     const searchInput = page.getByPlaceholder('Search memories...');
     await searchInput.fill('Greeting');
 
-    await page.waitForTimeout(500);
     await expect(page.getByText('User Greeting Preferences')).toBeVisible();
     await expect(page.getByText('Research Source Priority')).not.toBeVisible();
   });
@@ -63,8 +62,6 @@ test.describe('Memory Vault', () => {
 
     // Wait for dialog to close and refetch to complete
     await expect(page.getByText('Delete Memory')).not.toBeVisible();
-    await page.waitForTimeout(1000);
-
     await expect(page.getByText('User Greeting Preferences', { exact: true })).not.toBeVisible();
   });
 });

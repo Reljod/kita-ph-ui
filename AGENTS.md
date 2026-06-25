@@ -28,5 +28,5 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 ### Known issues
 - Chat SSE streaming is mocked with static response (no real streaming in tests)
 - Auth store user is null after `mockLoggedIn` — only `loginAsUser` populates it
-- Test worker count: CI uses 1, local uses default (4)
+- Test worker count: CI uses 1, local uses Playwright's default (derived from available CPU cores)
 - Retries: 1 on CI, 0 locally

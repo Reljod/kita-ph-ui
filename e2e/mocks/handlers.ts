@@ -106,8 +106,91 @@ const llms = [
   { id: 'llm-2', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', model: 'claude-3-5-sonnet' },
 ];
 
+function seededState() {
+  return {
+    agents: [
+      {
+        id: 'agent-1',
+        name: 'ResearchBot',
+        role: 'Research Assistant',
+        goal: 'Help users find and synthesize information',
+        backstory: 'Expert in research and data analysis',
+        llm_id: 'llm-1',
+        color: 'bg-blue-600',
+        updated_at: '2025-06-01T10:00:00Z',
+        tools: ['tool-1'],
+      },
+      {
+        id: 'agent-2',
+        name: 'DevHelper',
+        role: 'Coding Assistant',
+        goal: 'Help with software development tasks',
+        backstory: 'Experienced software engineer',
+        llm_id: 'llm-2',
+        color: 'bg-emerald-600',
+        updated_at: '2025-06-02T10:00:00Z',
+        tools: ['tool-1', 'tool-2'],
+      },
+    ],
+    memories: [
+      {
+        id: 'mem-1',
+        org_id: 'org-1',
+        content: 'User prefers concise responses with bullet points',
+        title: 'User Greeting Preferences',
+        status: 'completed' as const,
+        updated_at: '2025-06-05T10:00:00Z',
+      },
+      {
+        id: 'mem-2',
+        org_id: 'org-1',
+        agent_id: 'agent-1',
+        content: 'ResearchBot should prioritize peer-reviewed sources',
+        title: 'Research Source Priority',
+        status: 'completed' as const,
+        updated_at: '2025-06-06T10:00:00Z',
+      },
+    ],
+    files: [
+      {
+        id: 'file-1',
+        filename: 'project_requirements.pdf',
+        extension: 'pdf',
+        size: 204800,
+        content_type: 'application/pdf',
+        org_id: 'org-1',
+        status: 'completed' as const,
+        created_at: '2025-06-03T10:00:00Z',
+        updated_at: '2025-06-03T10:00:00Z',
+      },
+      {
+        id: 'file-2',
+        filename: 'api_documentation.md',
+        extension: 'md',
+        size: 102400,
+        content_type: 'text/markdown',
+        org_id: 'org-1',
+        agent_id: 'agent-1',
+        status: 'completed' as const,
+        created_at: '2025-06-04T10:00:00Z',
+        updated_at: '2025-06-04T10:00:00Z',
+      },
+    ],
+  };
+}
+
+export function resetMockState() {
+  const seed = seededState();
+  agents.length = 0;
+  agents.push(...seed.agents);
+  memories.length = 0;
+  memories.push(...seed.memories);
+  files.length = 0;
+  files.push(...seed.files);
+}
+
 export async function setupApiMocks(page: Page) {
-  // State reset happens each test via fresh module scope
+  resetMockState();
 
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url());
@@ -178,14 +261,20 @@ export async function setupApiMocks(page: Page) {
         }
         if (method === 'POST') {
           const body = JSON.parse(route.request().postData() || '{}');
-          const created = { id: uuidv4(), org_id: 'org-1', ...body, status: 'completed', updated_at: new Date().toISOString() };
+          const created = { id: uuidv4(), org_id: 'org-1', agent_id: agentId, ...body, status: 'completed', updated_at: new Date().toISOString() };
           memories.push(created);
           await route.fulfill(json(201, created));
           return;
         }
         if (method === 'PUT' && memId) {
           const body = JSON.parse(route.request().postData() || '{}');
-          await route.fulfill(json(200, { id: memId, ...body, updated_at: new Date().toISOString() }));
+          const idx = memories.findIndex(m => m.id === memId);
+          if (idx !== -1) {
+            memories[idx] = { ...memories[idx], ...body, updated_at: new Date().toISOString() };
+            await route.fulfill(json(200, memories[idx]));
+          } else {
+            await route.fulfill(json(404, { detail: 'Memory not found' }));
+          }
           return;
         }
         if (method === 'DELETE' && memId) {
@@ -197,8 +286,21 @@ export async function setupApiMocks(page: Page) {
       }
 
       // --- AGENT TOOLS ---
-      if (path.match(/^\/agent\/[^/]+\/tools\/(add|remove)$/)) {
-        await route.fulfill(json(200, { message: 'Tool updated' }));
+      const agentToolsMatch = path.match(/^\/agent\/([^/]+)\/tools\/(add|remove)$/);
+      if (agentToolsMatch) {
+        const [, agentId, action] = agentToolsMatch;
+        const body = JSON.parse(route.request().postData() || '{}');
+        const idx = agents.findIndex(a => a.id === agentId);
+        if (idx !== -1) {
+          if (action === 'add') {
+            agents[idx].tools = [...agents[idx].tools, body.tool_id];
+          } else {
+            agents[idx].tools = agents[idx].tools.filter(t => t !== body.tool_id);
+          }
+          await route.fulfill(json(200, { message: 'Tool updated', tools: agents[idx].tools }));
+        } else {
+          await route.fulfill(json(404, { detail: 'Agent not found' }));
+        }
         return;
       }
 

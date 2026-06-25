@@ -12,7 +12,7 @@ test.describe('Tools Browser', () => {
     await page.goto('/tools');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('Tools Registry')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Tools Registry' })).toBeVisible();
     await expect(page.getByText('Web Search')).toBeVisible();
     await expect(page.getByText('Code Interpreter')).toBeVisible();
     await expect(page.getByText('Memory Search')).toBeVisible();

@@ -50,7 +50,7 @@ test.describe('Authentication', () => {
     await loginAsUser(page);
 
     // Click user menu by the displayed name (email.split('@')[0] = 'test')
-    await page.getByText('test').click();
+    await page.getByRole('button', { name: 'test' }).click();
     await page.getByRole('button', { name: 'Logout' }).click();
     await expect(page).toHaveURL(/\/login/);
   });
