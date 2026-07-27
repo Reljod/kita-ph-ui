@@ -67,12 +67,16 @@ api.interceptors.response.use(
                     console.error('Token refresh failed:', refreshError);
                     // Clear state and cookies using Zustand auth store
                     useAuthStore.getState().logout();
-                    return;
+                    // Reject rather than returning: a bare `return` resolves
+                    // the promise with undefined, so `await api.get(...)`
+                    // hands the caller undefined and the next `.data` access
+                    // throws a TypeError far from the actual auth failure.
+                    return Promise.reject(error);
                 }
             } else {
                 // No refresh token available
                 useAuthStore.getState().logout();
-                return;
+                return Promise.reject(error);
             }
         }
         return Promise.reject(error);
