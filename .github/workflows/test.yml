@@ -97,9 +97,10 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          # Videos and screenshots for every spec, plus the HTML report and
-          # the API/UI server logs. Deliberately uploaded rather than
-          # committed — they are ~10MB per run.
+          # A screenshot from every spec, plus the HTML report, traces for any
+          # failure, and the API/UI server logs. Uploaded rather than
+          # committed. Video capture is off (see playwright.config.ts), so
+          # nothing here is a .webm.
           name: e2e-evidence
           path: kita-ph-ui/tests/e2e/artifacts/
           retention-days: 30

@@ -24,9 +24,12 @@ export default defineConfig({
     outputDir: 'tests/e2e/artifacts/test-results',
     use: {
         baseURL: BASE_URL,
-        // Evidence for PR review: a video of every spec and a screenshot at
-        // the end of each, uploaded as CI artifacts rather than committed.
-        video: 'on',
+        // Evidence for PR review: a screenshot from every spec, uploaded as a
+        // CI artifact rather than committed. Video is off on purpose — it was
+        // the bulk of the ~11MB per run and the screenshots carry the same
+        // review signal. A failing spec still gets a trace, which is more
+        // useful than video for diagnosis anyway.
+        video: 'off',
         screenshot: 'on',
         trace: 'retain-on-failure',
         actionTimeout: 15_000,
