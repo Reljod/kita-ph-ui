@@ -133,10 +133,10 @@ export function AddKnowledgeModal({
                     await knowledgeService.completeUpload(initiateRes.file_id);
 
                     f.status = 'completed';
-                } catch (err: any) {
+                } catch (err: unknown) {
                     console.error(`Failed to upload ${f.file.name}:`, err);
                     f.status = 'error';
-                    f.error = err.message || 'Upload failed';
+                    f.error = err instanceof Error ? err.message : 'Upload failed';
                 }
                 setFiles([...updatedFiles]);
             }
@@ -199,8 +199,9 @@ export function AddKnowledgeModal({
                 {/* Agent Selector */}
                 {scope === 'agent' && (
                     <div className="space-y-2">
-                        <label className="text-sm font-semibold text-slate-700">Select Agent</label>
+                        <label htmlFor="knowledge-agent" className="text-sm font-semibold text-slate-700">Select Agent</label>
                         <select
+                            id="knowledge-agent"
                             value={agentId}
                             disabled={isSubmitting}
                             onChange={(e) => setAgentId(e.target.value)}
@@ -217,10 +218,11 @@ export function AddKnowledgeModal({
 
                 {/* Optional Filename */}
                 <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700">
+                    <label htmlFor="knowledge-filename" className="text-sm font-semibold text-slate-700">
                         Filename <span className="text-slate-400 font-normal">{editingFile ? '' : '(Optional)'}</span>
                     </label>
                     <input
+                        id="knowledge-filename"
                         type="text"
                         disabled={isSubmitting}
                         placeholder={editingFile ? "Update filename" : "Override filename (applies to first file if batching)"}
@@ -233,7 +235,7 @@ export function AddKnowledgeModal({
                 {/* Upload Area - Hide when editing */}
                 {!editingFile && (
                     <div className="space-y-3">
-                        <label className="text-sm font-semibold text-slate-700">Files</label>
+                        <label htmlFor="knowledge-files" className="text-sm font-semibold text-slate-700">Files</label>
                         <div
                             onDragOver={(e) => e.preventDefault()}
                             onDrop={handleDrop}
@@ -241,6 +243,7 @@ export function AddKnowledgeModal({
                             className="border-2 border-dashed border-slate-200 rounded-3xl p-8 flex flex-col items-center justify-center gap-3 hover:border-indigo-400 hover:bg-slate-50 transition-all cursor-pointer"
                         >
                             <input
+                                id="knowledge-files"
                                 type="file"
                                 multiple
                                 hidden

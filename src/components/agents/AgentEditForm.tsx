@@ -248,8 +248,9 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
                         <>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Title</label>
+                                    <label htmlFor="kb-title" className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Title</label>
                                     <input
+                                        id="kb-title"
                                         type="text"
                                         value={editingMemory.title}
                                         onChange={(e) => setEditingMemory({ ...editingMemory, title: e.target.value })}
@@ -257,8 +258,9 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Content</label>
+                                    <label htmlFor="kb-content" className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Content</label>
                                     <textarea
+                                        id="kb-content"
                                         value={editingMemory.content}
                                         onChange={(e) => setEditingMemory({ ...editingMemory, content: e.target.value })}
                                         rows={5}
@@ -301,8 +303,9 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
                         <>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Title</label>
+                                    <label htmlFor="memory-title" className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Title</label>
                                     <input
+                                        id="memory-title"
                                         type="text"
                                         placeholder="e.g. My Father's Birthday"
                                         value={addingMemory.title}
@@ -311,8 +314,9 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Content</label>
+                                    <label htmlFor="memory-content" className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Content</label>
                                     <textarea
+                                        id="memory-content"
                                         placeholder="Add specific context or knowledge..."
                                         value={addingMemory.content}
                                         onChange={(e) => setAddingMemory({ ...addingMemory, content: e.target.value })}
@@ -424,8 +428,9 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Agent Name</label>
+                            <label htmlFor="agent-name" className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Agent Name</label>
                             <input
+                                id="agent-name"
                                 type="text"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -436,8 +441,9 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Role / Persona</label>
+                            <label htmlFor="agent-role" className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Role / Persona</label>
                             <input
+                                id="agent-role"
                                 type="text"
                                 value={formData.role}
                                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
@@ -452,8 +458,9 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
                                 <Cpu size={18} />
                                 <h2 className="font-bold uppercase tracking-wider text-xs">LLM Configuration</h2>
                             </div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Selected Model</label>
+                            <label htmlFor="agent-llm" className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Selected Model</label>
                             <select
+                                id="agent-llm"
                                 value={formData.llm_id}
                                 onChange={(e) => setFormData({ ...formData, llm_id: e.target.value })}
                                 disabled={readOnly}

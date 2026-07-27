@@ -76,7 +76,13 @@ export default function LoginPage() {
                 </p>
 
                 {error && (
-                    <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm flex items-start gap-2">
+                    <div
+                        // The message appears after the page has loaded, so a
+                        // screen reader has no reason to revisit it. Without a
+                        // live region the form just silently fails to submit.
+                        role="alert"
+                        className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm flex items-start gap-2"
+                    >
                         <KeyRound size={16} className="mt-0.5 shrink-0" />
                         <span>{error}</span>
                     </div>

@@ -225,6 +225,11 @@ export default async function globalSetup(): Promise<void> {
                 throw new Error(`next build failed:\n${build.stdout}\n${build.stderr}`);
             }
         }
+        // artifacts/ is gitignored, so a fresh checkout has no directory to
+        // open this log in. The only other mkdir sits in the local-API branch,
+        // which remote mode skips — which is why this passed locally and
+        // ENOENT'd on the first CI run that got this far.
+        mkdirSync(path.resolve(__dirname, '../artifacts'), { recursive: true });
         const uiLog = path.resolve(__dirname, '../artifacts/ui-server.log');
         const uiOut = openSync(uiLog, 'w');
         const ui = spawn('npx', ['next', 'start', '-p', String(UI_PORT)], {

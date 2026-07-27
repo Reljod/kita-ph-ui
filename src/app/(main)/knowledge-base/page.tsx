@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { knowledgeService } from '@/services/knowledgeService';
@@ -15,7 +15,11 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 export default function KnowledgeBasePage() {
     const queryClient = useQueryClient();
     const [scope, setScope] = useState<'agent' | 'org'>('org');
-    const [selectedAgentId, setSelectedAgentId] = useState<string>('');
+    // The picker's value is only ever "whatever the user chose, else the
+    // first agent". Storing that in an effect meant a cascading render on
+    // every load and a re-keyed query; deriving it is the same value with
+    // neither.
+    const [pickedAgentId, setPickedAgentId] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
@@ -38,16 +42,14 @@ export default function KnowledgeBasePage() {
         },
     });
 
-    // Handle initial agent selection
-    useEffect(() => {
-        if (agents.length > 0 && !selectedAgentId) {
-            setSelectedAgentId(agents[0].id);
-        }
-    }, [agents, selectedAgentId]);
+    const selectedAgentId = pickedAgentId || agents[0]?.id || '';
 
     // Fetch Knowledge Files
     const { data: files = [], isLoading } = useQuery<FileResponse[]>({
-        queryKey: ['knowledge', scope, selectedAgentId],
+        // See the memory page: the agent id belongs in the key only when the
+        // request carries it, or the agent list landing discards an org-wide
+        // result for an identical refetch.
+        queryKey: ['knowledge', scope, scope === 'agent' ? selectedAgentId : null],
         queryFn: () => knowledgeService.getAll(scope === 'agent' ? selectedAgentId : undefined),
         enabled: scope === 'org' || !!selectedAgentId,
         refetchInterval: (query) => {
@@ -152,7 +154,7 @@ export default function KnowledgeBasePage() {
                             <div className="relative group">
                                 <select
                                     value={selectedAgentId}
-                                    onChange={(e) => setSelectedAgentId(e.target.value)}
+                                    onChange={(e) => setPickedAgentId(e.target.value)}
                                     className="appearance-none pl-4 pr-10 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer shadow-sm min-w-[200px]"
                                 >
                                     {agents.map(a => (

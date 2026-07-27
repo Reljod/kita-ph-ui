@@ -1,11 +1,17 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
 
 // Public env the app reads at module scope. Pinned here so a unit run does not
 // depend on whichever Doppler config happens to be exported.
 process.env.NEXT_PUBLIC_API_URL = '/api';
 process.env.NEXT_PUBLIC_BACKEND_URL = 'http://localhost:8080';
+
+// The page suites settle over two query cycles — the agent list lands,
+// which selects an agent, which re-keys the memories query. Under a full
+// file that lands just past the 1s default, so findBy* times out on a
+// render that was going to succeed.
+configure({ asyncUtilTimeout: 5000 });
 
 // jsdom implements neither of these, and Radix/shadcn components call both.
 globalThis.ResizeObserver =

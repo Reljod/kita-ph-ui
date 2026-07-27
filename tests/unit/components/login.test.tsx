@@ -245,11 +245,10 @@ describe('the login page', () => {
             render(<LoginPage />);
             fillIn();
             submit();
-            const message = await screen.findByRole('alert').catch(() => null);
             // The exact copy comes from getFriendlyErrorMessage; what matters
             // is that a 500 does not read as "wrong password".
-            const text = message?.textContent ?? document.body.textContent ?? '';
-            expect(text).not.toMatch(/incorrect email or password/i);
+            const message = await screen.findByRole('alert');
+            expect(message.textContent).not.toMatch(/incorrect email or password/i);
         });
     });
 });

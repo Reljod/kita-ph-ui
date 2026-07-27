@@ -110,8 +110,9 @@ export function AddMemoryModal({
                 {/* Agent Selector (if agent scope) */}
                 {scope === 'agent' && (
                     <div className="space-y-2">
-                        <label className="text-sm font-semibold text-slate-700">Select Agent</label>
+                        <label htmlFor="memory-agent" className="text-sm font-semibold text-slate-700">Select Agent</label>
                         <select
+                            id="memory-agent"
                             value={agentId}
                             onChange={(e) => setAgentId(e.target.value)}
                             className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none"
@@ -127,8 +128,9 @@ export function AddMemoryModal({
 
                 {/* Memory Title */}
                 <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700">Memory Title / Query</label>
+                    <label htmlFor="memory-title" className="text-sm font-semibold text-slate-700">Memory Title / Query</label>
                     <input
+                        id="memory-title"
                         type="text"
                         required
                         placeholder="e.g. User Greeting Preferences"
@@ -140,8 +142,9 @@ export function AddMemoryModal({
 
                 {/* Content */}
                 <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700">Content</label>
+                    <label htmlFor="memory-content" className="text-sm font-semibold text-slate-700">Content</label>
                     <textarea
+                        id="memory-content"
                         required
                         rows={4}
                         placeholder="Describe the memory content here..."
