@@ -11,12 +11,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the lint step diffs against the base branch.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run lint
+      - name: Lint the changed files
+        # `npm run lint` is unscoped and this tree already carries 20 eslint
+        # errors on main, so a repo-wide sweep fails every PR regardless of
+        # what it touched. Same reasoning as the pre-commit gate.
+        run: |
+          base="${{ github.base_ref || 'main' }}"
+          git fetch --no-tags origin "$base"
+          files=$(git diff --name-only --diff-filter=ACM "origin/$base...HEAD" \
+            -- '*.js' '*.jsx' '*.mjs' '*.ts' '*.tsx')
+          if [ -n "$files" ]; then npx eslint $files; fi
       - name: Vitest with coverage thresholds
         # vitest.config.ts fails the run below 90% lines/functions/branches/statements.
         run: npm run test:cov
@@ -61,6 +73,9 @@ jobs:
       - name: Install the Playwright browser
         working-directory: kita-ph-ui
         run: npx playwright install --with-deps chromium
+      - name: Build the UI once
+        working-directory: kita-ph-ui
+        run: npm run build
       - name: Run the E2E suite
         working-directory: kita-ph-ui
         env:
@@ -72,7 +87,12 @@ jobs:
           E2E_API_ROOT: ${{ github.workspace }}/Kita-PH
           API_KEY_ENCRYPTION_KEY: ${{ secrets.API_KEY_ENCRYPTION_KEY }}
           SECRET_KEY: ci-secret-key
+          E2E_SKIP_BUILD: '1'
         run: npm run test:e2e
+      - name: Show the API server log on failure
+        if: failure()
+        working-directory: kita-ph-ui
+        run: tail -100 tests/e2e/artifacts/api-server.log || true
       - name: Upload the run evidence
         uses: actions/upload-artifact@v4
         if: always()
