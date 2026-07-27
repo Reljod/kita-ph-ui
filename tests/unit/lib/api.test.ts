@@ -13,7 +13,12 @@ vi.mock('uuid', () => ({ v4: () => 'fixed-uuid' }));
 
 const { api } = await import('@/lib/api');
 
-type Interceptor<T> = { fulfilled: (v: T) => unknown; rejected: (e: unknown) => unknown };
+// `rejected` is declared as returning a promise because that is what an axios
+// rejection handler returns, and the tests chain .catch()/rejects on it.
+type Interceptor<T> = {
+    fulfilled: (v: T) => unknown;
+    rejected: (e: unknown) => Promise<unknown>;
+};
 
 /** Reach into the axios instance for the handlers we registered. */
 function requestInterceptor(): Interceptor<Record<string, unknown>> {

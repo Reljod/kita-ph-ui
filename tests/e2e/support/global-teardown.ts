@@ -26,7 +26,13 @@ export default async function globalTeardown(): Promise<void> {
     if (!existsSync(RUNTIME_FILE)) return;
     const runtime = JSON.parse(readFileSync(RUNTIME_FILE, 'utf8'));
 
-    if (process.env.E2E_KEEP_DB === '1') {
+    if (runtime.provisionedDb === false) {
+        // The run went through a deployed API, so the cluster it writes to is
+        // configured by that deployment rather than provisioned here. Dropping
+        // a database this process never created is not a cleanup, it is data
+        // loss on someone else's system.
+        log('ran against a deployed API — leaving its database untouched');
+    } else if (process.env.E2E_KEEP_DB === '1') {
         log(`E2E_KEEP_DB=1 — leaving ${runtime.dbName} in place`);
     } else {
         // Drop through pymongo in the API's own venv rather than adding a

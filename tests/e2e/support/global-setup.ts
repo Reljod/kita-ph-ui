@@ -6,6 +6,11 @@
  *     -> the Kita API on :8080
  *     -> Next.js on :3000, with those credentials in its environment
  *
+ * Set E2E_API_URL to run against an already-deployed API (FastAPI Cloud)
+ * instead of starting one locally. In that mode nothing here provisions or
+ * owns the backing stores — the deployment carries its own configuration —
+ * so no local Mongo/Redis is started and teardown drops nothing.
+ *
  * Everything it decides is written to tests/e2e/.runtime.json so teardown and
  * the specs can read it back.
  */
@@ -66,6 +71,24 @@ function registerApiClient(env: NodeJS.ProcessEnv): { clientId: string; apiKey: 
     return { clientId, apiKey: match[1] };
 }
 
+/**
+ * Credentials for a remote API. The generator script writes straight to Mongo,
+ * so it only works from a host that can reach the deployment's own cluster —
+ * which a CI runner may not. Supplying E2E_API_KEY skips it entirely.
+ */
+function remoteCredentials(
+    apiEnv: NodeJS.ProcessEnv
+): { clientId: string; apiKey: string } {
+    const apiKey = process.env.E2E_API_KEY;
+    if (apiKey) {
+        const clientId = process.env.E2E_CLIENT_ID ?? 'kita-e2e-client';
+        log(`using the supplied credentials for client ${clientId}`);
+        return { clientId, apiKey };
+    }
+    log('no E2E_API_KEY supplied — minting one against the API\'s Mongo');
+    return registerApiClient(apiEnv);
+}
+
 export default async function globalSetup(): Promise<void> {
     const envFile = process.env.E2E_API_ENV_FILE ?? '/home/user/.kita-api.env';
     const fileEnv = parseEnvFile(envFile);
@@ -73,13 +96,24 @@ export default async function globalSetup(): Promise<void> {
         log(`no env file at ${envFile}; relying on the ambient environment`);
     }
 
-    const services = await resolveServices({ ...fileEnv, ...process.env } as Record<string, string>);
+    // A deployed API owns its own Mongo/Redis wiring, so provisioning local
+    // stores here would only produce ones nothing ever reads.
+    const remoteApiUrl = process.env.E2E_API_URL?.replace(/\/+$/, '');
+    const services = remoteApiUrl
+        ? { mongoUri: '', redisUrl: '', mongoSource: 'remote', redisSource: 'remote', notes: [] }
+        : await resolveServices({ ...fileEnv, ...process.env } as Record<string, string>);
     services.notes.forEach((note) => log(note));
 
     const liveLlm = process.env.E2E_LIVE_LLM === '1';
     let openRouterBase = 'https://openrouter.ai/api/v1';
     let mockUrl: string | undefined;
-    if (liveLlm) {
+    if (remoteApiUrl) {
+        // The mock only works by pointing the API's OPENAI_BASE_URL at a local
+        // listener. A deployed API reads its own environment, so starting one
+        // here would silently do nothing — better to say so than to imply the
+        // LLM is stubbed when it is not.
+        log('remote API — LLM calls use whatever the deployment is configured with');
+    } else if (liveLlm) {
         log('E2E_LIVE_LLM=1 — calling the real OpenRouter API (costs money, output varies)');
     } else {
         const mock = await startMockOpenRouter();
@@ -108,32 +142,44 @@ export default async function globalSetup(): Promise<void> {
         SECRET_KEY: fileEnv.SECRET_KEY ?? 'e2e-secret-key',
     };
 
-    log(`Mongo: ${services.mongoSource}, Redis: ${services.redisSource}, db: ${E2E_DB_NAME}`);
+    let credentials: { clientId: string; apiKey: string };
+    let backendUrl: string;
 
-    if (!existsSync(API_ROOT)) {
-        throw new Error(
-            `Kita API checkout not found at ${API_ROOT}. Set E2E_API_ROOT to its path.`
-        );
-    }
-
-    const credentials = registerApiClient(apiEnv);
-    log(`registered API client ${credentials.clientId}`);
-
-    if (await canConnect('127.0.0.1', API_PORT, 1000)) {
-        log(`something is already listening on :${API_PORT}; reusing it`);
+    if (remoteApiUrl) {
+        backendUrl = remoteApiUrl;
+        log(`using the deployed API at ${backendUrl}`);
+        await waitForHttp(`${backendUrl}/docs`, 60_000);
+        log('deployed API answered');
+        credentials = remoteCredentials(apiEnv);
     } else {
-        mkdirSync(path.resolve(__dirname, '../artifacts'), { recursive: true });
-        const apiLog = path.resolve(__dirname, '../artifacts/api-server.log');
-        const out = openSync(apiLog, 'w');
-        apiProcess = spawn(
-            'uv',
-            ['run', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', String(API_PORT)],
-            { cwd: API_ROOT, env: apiEnv, stdio: ['ignore', out, out], detached: true }
-        );
-        apiProcess.unref();
-        log(`starting the Kita API on :${API_PORT} (log: ${apiLog})`);
-        await waitForHttp(`http://127.0.0.1:${API_PORT}/docs`);
-        log('Kita API is up');
+        log(`Mongo: ${services.mongoSource}, Redis: ${services.redisSource}, db: ${E2E_DB_NAME}`);
+
+        if (!existsSync(API_ROOT)) {
+            throw new Error(
+                `Kita API checkout not found at ${API_ROOT}. Set E2E_API_ROOT to its path.`
+            );
+        }
+
+        credentials = registerApiClient(apiEnv);
+        log(`registered API client ${credentials.clientId}`);
+        backendUrl = `http://127.0.0.1:${API_PORT}`;
+
+        if (await canConnect('127.0.0.1', API_PORT, 1000)) {
+            log(`something is already listening on :${API_PORT}; reusing it`);
+        } else {
+            mkdirSync(path.resolve(__dirname, '../artifacts'), { recursive: true });
+            const apiLog = path.resolve(__dirname, '../artifacts/api-server.log');
+            const out = openSync(apiLog, 'w');
+            apiProcess = spawn(
+                'uv',
+                ['run', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', String(API_PORT)],
+                { cwd: API_ROOT, env: apiEnv, stdio: ['ignore', out, out], detached: true }
+            );
+            apiProcess.unref();
+            log(`starting the Kita API on :${API_PORT} (log: ${apiLog})`);
+            await waitForHttp(`${backendUrl}/docs`);
+            log('Kita API is up');
+        }
     }
 
     // --- Next.js ----------------------------------------------------------
@@ -143,11 +189,11 @@ export default async function globalSetup(): Promise<void> {
     // time, and those only exist once registerApiClient() has run.
     const uiEnv: NodeJS.ProcessEnv = {
         ...process.env,
-        KITA_BACKEND_URL: `http://127.0.0.1:${API_PORT}`,
+        KITA_BACKEND_URL: backendUrl,
         KITA_CLIENT_ID: credentials.clientId,
         KITA_API_KEY: credentials.apiKey,
         NEXT_PUBLIC_API_URL: '/api',
-        NEXT_PUBLIC_BACKEND_URL: `http://127.0.0.1:${API_PORT}`,
+        NEXT_PUBLIC_BACKEND_URL: backendUrl,
     };
 
     let uiPid: number | null = null;
@@ -188,6 +234,11 @@ export default async function globalSetup(): Promise<void> {
         mongoSource: services.mongoSource,
         redisSource: services.redisSource,
         dbName: E2E_DB_NAME,
+        // Teardown drops the database only when this run created it. Against a
+        // deployed API the cluster belongs to the deployment, and dropping
+        // someone else's data is not ours to do.
+        provisionedDb: !remoteApiUrl,
+        backendUrl,
         apiPort: API_PORT,
         apiPid: apiProcess?.pid ?? null,
         clientId: credentials.clientId,
