@@ -66,7 +66,13 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - name: Install API dependencies
         working-directory: Kita-PH
-        run: uv sync --group dev
+        # Runtime deps only, deliberately. This job runs the API server and
+        # the client-generator script; it never runs the API's own test
+        # suite. Asking for --group dev also coupled this job to whichever
+        # API revision defines that group — the checkout above takes the API's
+        # default branch, so the flag failed outright until the group landed
+        # on main.
+        run: uv sync
       - name: Install UI dependencies
         working-directory: kita-ph-ui
         run: npm ci
