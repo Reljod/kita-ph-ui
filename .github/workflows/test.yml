@@ -53,18 +53,22 @@ jobs:
     # Pointing at the deployment tests what is actually running.
     env:
       E2E_API_URL: ${{ vars.E2E_API_URL || 'https://kita-api-dev.fastapicloud.dev' }}
+      # Sourced from the Doppler-synced repository secrets so this config has a
+      # single origin, with the deployment URL as a fallback for a fork or a
+      # repo that has not been synced.
+      #
       # NEXT_PUBLIC_* is inlined into the client bundle at build time, so it has
       # to be set on the step that builds — globalSetup putting it in the
       # `next start` environment is far too late. Without it the browser falls
       # back to http://localhost:8000, where nothing is listening, and every
       # spec that logs in dies on a timeout while unauthenticated ones pass.
       # Job-level so the build step and the run step cannot disagree.
-      NEXT_PUBLIC_API_URL: /api
-      NEXT_PUBLIC_BACKEND_URL: ${{ vars.E2E_API_URL || 'https://kita-api-dev.fastapicloud.dev' }}
+      NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || '/api' }}
+      NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL || vars.E2E_API_URL || 'https://kita-api-dev.fastapicloud.dev' }}
       # The server-side proxy target. globalSetup also injects this when it
       # starts Next itself, but it reuses an already-listening :3000 as-is —
       # so setting it here keeps the two paths agreeing.
-      KITA_BACKEND_URL: ${{ vars.E2E_API_URL || 'https://kita-api-dev.fastapicloud.dev' }}
+      KITA_BACKEND_URL: ${{ secrets.KITA_BACKEND_URL || vars.E2E_API_URL || 'https://kita-api-dev.fastapicloud.dev' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -76,13 +80,26 @@ jobs:
         # A missing secret is a repository-configuration gap, not a defect in
         # the diff. Say exactly what to add and stop, rather than failing a
         # required check that no code change could ever turn green.
+        env:
+          # Either pair works — they are the same credential. E2E_* wins so a
+          # dedicated test client can be swapped in without touching the app's.
+          API_KEY: ${{ secrets.E2E_API_KEY || secrets.KITA_API_KEY }}
         run: |
-          if [ -z "${{ secrets.E2E_API_KEY }}" ]; then
-            echo "::warning title=E2E skipped::Set the E2E_API_KEY and E2E_CLIENT_ID repository secrets to run the E2E suite. Their values are the KITA_API_KEY / KITA_CLIENT_ID pair registered in kita_admin.clients."
+          if [ -z "$API_KEY" ]; then
+            echo "::warning title=E2E skipped::Set E2E_API_KEY/E2E_CLIENT_ID (or sync KITA_API_KEY/KITA_CLIENT_ID from Doppler) to run the E2E suite. The value is a client registered in kita_admin.clients."
             echo "ready=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          # A Doppler config pointed at a developer's machine would rebuild the
+          # localhost failure this job exists to catch, and the symptom is a
+          # 30s timeout with nothing in the log. Refuse it up front instead.
+          case "$NEXT_PUBLIC_BACKEND_URL$KITA_BACKEND_URL" in
+            *localhost*|*127.0.0.1*)
+              echo "::error title=E2E misconfigured::NEXT_PUBLIC_BACKEND_URL / KITA_BACKEND_URL point at localhost, but this job runs against a deployment. Update the Doppler config these secrets sync from."
+              exit 1
+              ;;
+          esac
+          echo "ready=true" >> "$GITHUB_OUTPUT"
       - name: Install UI dependencies
         if: steps.creds.outputs.ready == 'true'
         run: npm ci
@@ -95,8 +112,8 @@ jobs:
       - name: Run the E2E suite
         if: steps.creds.outputs.ready == 'true'
         env:
-          E2E_API_KEY: ${{ secrets.E2E_API_KEY }}
-          E2E_CLIENT_ID: ${{ secrets.E2E_CLIENT_ID }}
+          E2E_API_KEY: ${{ secrets.E2E_API_KEY || secrets.KITA_API_KEY }}
+          E2E_CLIENT_ID: ${{ secrets.E2E_CLIENT_ID || secrets.KITA_CLIENT_ID }}
           E2E_SKIP_BUILD: '1'
         run: npm run test:e2e
       - name: Upload the run evidence
