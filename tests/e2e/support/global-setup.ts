@@ -72,20 +72,34 @@ function registerApiClient(env: NodeJS.ProcessEnv): { clientId: string; apiKey: 
 }
 
 /**
- * Credentials for a remote API. The generator script writes straight to Mongo,
- * so it only works from a host that can reach the deployment's own cluster —
- * which a CI runner may not. Supplying E2E_API_KEY skips it entirely.
+ * Credentials for a remote API, in order of preference:
+ *
+ *   E2E_API_KEY            — a CI secret, the only option on a runner
+ *   KITA_API_KEY           — the UI's own credentials from .kita-ui.env
+ *   generate_client.py     — mint a fresh one
+ *
+ * The generator writes straight to Mongo, so it only works from a host that
+ * can reach the deployment's own cluster. A runner generally cannot, which is
+ * why the two supplied forms come first.
  */
-function remoteCredentials(
-    apiEnv: NodeJS.ProcessEnv
-): { clientId: string; apiKey: string } {
-    const apiKey = process.env.E2E_API_KEY;
-    if (apiKey) {
+function remoteCredentials(apiEnv: NodeJS.ProcessEnv): {
+    clientId: string;
+    apiKey: string;
+} {
+    if (process.env.E2E_API_KEY) {
         const clientId = process.env.E2E_CLIENT_ID ?? 'kita-e2e-client';
         log(`using the supplied credentials for client ${clientId}`);
-        return { clientId, apiKey };
+        return { clientId, apiKey: process.env.E2E_API_KEY };
     }
-    log('no E2E_API_KEY supplied — minting one against the API\'s Mongo');
+
+    const uiEnvFile = process.env.E2E_UI_ENV_FILE ?? '/home/user/.kita-ui.env';
+    const uiEnv = parseEnvFile(uiEnvFile);
+    if (uiEnv.KITA_API_KEY && uiEnv.KITA_CLIENT_ID) {
+        log(`using the UI credentials from ${uiEnvFile} (${uiEnv.KITA_CLIENT_ID})`);
+        return { clientId: uiEnv.KITA_CLIENT_ID, apiKey: uiEnv.KITA_API_KEY };
+    }
+
+    log("no credentials supplied — minting one against the API's Mongo");
     return registerApiClient(apiEnv);
 }
 

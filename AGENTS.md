@@ -38,6 +38,18 @@ don't narrate it.
 - **Quality by layering, not diligence.** Cheap deterministic checks early
   under mandatory ones later beats relying on remembering to be careful (see
   the layer model below).
+- **E2E starts Next itself, not via playwright's `webServer`.** That hook
+  runs before `globalSetup`, so the API proxy would come up with empty
+  credentials. → **`run-e2e`**
+- **Only drop what this process created.** Against a deployed API the
+  cluster belongs to the deployment; teardown skips the drop rather than
+  deleting data it does not own. → **`run-e2e`**
+- **Never `pkill` in this environment.** The pattern matches the shell
+  running it, so the session dies with an empty log and a confusing exit
+  code. Probe ports and kill by recorded pid. → **`run-e2e`**
+- **This sandbox has HTTPS egress only.** Mongo Atlas `:27017` is
+  unreachable here while `:443` works, so a Mongo timeout is the network,
+  not the credentials.
 - _Add your project's WHYs here as they emerge._
 
 ## How code quality is enforced (the layer model)
