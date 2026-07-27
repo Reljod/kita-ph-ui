@@ -4,7 +4,7 @@
  *   backing services (cloud-first, local fallback)
  *     -> a registered API client, so the UI's proxy can authenticate
  *     -> the Kita API on :8080
- *     -> Next.js is started separately by Playwright's `webServer`
+ *     -> Next.js on :3000, with those credentials in its environment
  *
  * Everything it decides is written to tests/e2e/.runtime.json so teardown and
  * the specs can read it back.
@@ -21,6 +21,7 @@ const REPO_ROOT = path.resolve(__dirname, '../../..');
 const API_ROOT = process.env.E2E_API_ROOT ?? path.resolve(REPO_ROOT, '../Kita-PH');
 const RUNTIME_FILE = path.resolve(__dirname, '../.runtime.json');
 const API_PORT = Number(process.env.E2E_API_PORT ?? 8080);
+const UI_PORT = Number(process.env.E2E_UI_PORT ?? 3000);
 
 let apiProcess: ChildProcess | undefined;
 
@@ -135,7 +136,53 @@ export default async function globalSetup(): Promise<void> {
         log('Kita API is up');
     }
 
+    // --- Next.js ----------------------------------------------------------
+    // Started here rather than through playwright's `webServer` because that
+    // runs before globalSetup: the proxy in src/app/api/[...path]/route.ts
+    // reads KITA_API_KEY / KITA_CLIENT_ID from its own process env at request
+    // time, and those only exist once registerApiClient() has run.
+    const uiEnv: NodeJS.ProcessEnv = {
+        ...process.env,
+        KITA_BACKEND_URL: `http://127.0.0.1:${API_PORT}`,
+        KITA_CLIENT_ID: credentials.clientId,
+        KITA_API_KEY: credentials.apiKey,
+        NEXT_PUBLIC_API_URL: '/api',
+        NEXT_PUBLIC_BACKEND_URL: `http://127.0.0.1:${API_PORT}`,
+    };
+
+    let uiPid: number | null = null;
+    if (await canConnect('127.0.0.1', UI_PORT, 1000)) {
+        log(`something is already listening on :${UI_PORT}; reusing it`);
+    } else {
+        if (process.env.E2E_SKIP_BUILD !== '1') {
+            log('building the Next app (set E2E_SKIP_BUILD=1 to reuse an existing build)');
+            const build = spawnSync('npm', ['run', 'build'], {
+                cwd: REPO_ROOT,
+                env: uiEnv,
+                encoding: 'utf8',
+            });
+            if (build.status !== 0) {
+                throw new Error(`next build failed:\n${build.stdout}\n${build.stderr}`);
+            }
+        }
+        const uiLog = path.resolve(__dirname, '../artifacts/ui-server.log');
+        const uiOut = openSync(uiLog, 'w');
+        const ui = spawn('npx', ['next', 'start', '-p', String(UI_PORT)], {
+            cwd: REPO_ROOT,
+            env: uiEnv,
+            stdio: ['ignore', uiOut, uiOut],
+            detached: true,
+        });
+        ui.unref();
+        uiPid = ui.pid ?? null;
+        log(`starting Next on :${UI_PORT} (log: ${uiLog})`);
+        await waitForHttp(`http://127.0.0.1:${UI_PORT}/login`);
+        log('Next is up with API credentials in its environment');
+    }
+
     const runtime = {
+        uiPid,
+        uiPort: UI_PORT,
         mongoUri: services.mongoUri,
         redisUrl: services.redisUrl,
         mongoSource: services.mongoSource,
@@ -150,12 +197,4 @@ export default async function globalSetup(): Promise<void> {
         notes: services.notes,
     };
     writeFileSync(RUNTIME_FILE, JSON.stringify(runtime, null, 2));
-
-    // The Next dev server (started by playwright's webServer) needs the same
-    // credentials, and reads them from its own process env.
-    process.env.KITA_BACKEND_URL = `http://127.0.0.1:${API_PORT}`;
-    process.env.KITA_CLIENT_ID = credentials.clientId;
-    process.env.KITA_API_KEY = credentials.apiKey;
-    process.env.NEXT_PUBLIC_API_URL = '/api';
-    process.env.NEXT_PUBLIC_BACKEND_URL = `http://127.0.0.1:${API_PORT}`;
 }

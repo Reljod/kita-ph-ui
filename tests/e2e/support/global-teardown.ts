@@ -58,6 +58,19 @@ export default async function globalTeardown(): Promise<void> {
         log((result.stdout || result.stderr || 'drop finished').trim());
     }
 
+    if (runtime.uiPid) {
+        try {
+            process.kill(-runtime.uiPid, 'SIGTERM');
+            log(`stopped Next (pid ${runtime.uiPid})`);
+        } catch {
+            try {
+                process.kill(runtime.uiPid, 'SIGTERM');
+            } catch {
+                /* already gone */
+            }
+        }
+    }
+
     if (runtime.apiPid) {
         try {
             process.kill(runtime.apiPid, 'SIGTERM');

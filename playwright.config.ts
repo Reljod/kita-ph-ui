@@ -50,17 +50,9 @@ export default defineConfig({
             },
         },
     ],
-    webServer: {
-        // Production build: `next dev` recompiles per route, which turns the
-        // first visit to each page into a multi-second stall and makes the
-        // whole suite flaky on timing.
-        command: process.env.E2E_SKIP_BUILD === "1"
-            ? `npx next start -p ${UI_PORT}`
-            : `npm run build && npx next start -p ${UI_PORT}`,
-        url: BASE_URL,
-        reuseExistingServer: !process.env.CI,
-        timeout: 300_000,
-        stdout: 'pipe',
-        stderr: 'pipe',
-    },
+    // Next is deliberately NOT started via `webServer`: Playwright launches
+    // that before globalSetup runs, so the server would come up before the
+    // API client credentials exist and its /api proxy would forward empty
+    // x-api-key/x-client-id headers — every login 401s. globalSetup starts it
+    // instead, once the credentials are known.
 });

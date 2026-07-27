@@ -1,0 +1,85 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit:
+    name: Unit tests + coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - name: Vitest with coverage thresholds
+        # vitest.config.ts fails the run below 90% lines/functions/branches/statements.
+        run: npm run test:cov
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-coverage
+          path: coverage/
+          retention-days: 14
+
+  e2e:
+    name: End-to-end
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports: ['27018:27017']
+      redis:
+        image: redis:7
+        ports: ['6380:6379']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: kita-ph-ui
+      - name: Check out the API alongside it
+        uses: actions/checkout@v4
+        with:
+          repository: Reljod/Kita-PH
+          path: Kita-PH
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: kita-ph-ui/package-lock.json
+      - uses: astral-sh/setup-uv@v5
+      - name: Install API dependencies
+        working-directory: Kita-PH
+        run: uv sync --group dev
+      - name: Install UI dependencies
+        working-directory: kita-ph-ui
+        run: npm ci
+      - name: Install the Playwright browser
+        working-directory: kita-ph-ui
+        run: npx playwright install --with-deps chromium
+      - name: Run the E2E suite
+        working-directory: kita-ph-ui
+        env:
+          # The service containers above are already reachable, so the
+          # cloud-first probe in tests/e2e/support/services.ts resolves to
+          # them without needing Atlas credentials in CI.
+          MONGO_URI: mongodb://127.0.0.1:27018
+          REDIS_CONNECTION_STRING: redis://127.0.0.1:6380/0
+          E2E_API_ROOT: ${{ github.workspace }}/Kita-PH
+          API_KEY_ENCRYPTION_KEY: ${{ secrets.API_KEY_ENCRYPTION_KEY }}
+          SECRET_KEY: ci-secret-key
+        run: npm run test:e2e
+      - name: Upload the run evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          # Videos and screenshots for every spec, plus the HTML report and
+          # the API/UI server logs. Deliberately uploaded rather than
+          # committed — they are ~10MB per run.
+          name: e2e-evidence
+          path: kita-ph-ui/tests/e2e/artifacts/
+          retention-days: 30

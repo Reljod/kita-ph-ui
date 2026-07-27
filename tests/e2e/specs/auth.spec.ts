@@ -122,10 +122,28 @@ test.describe('login failures', () => {
         expect(body.toLowerCase()).not.toMatch(/organization (code )?(does not exist|not found)/);
     });
 
-    test('the browser blocks submitting an empty form', async ({ page }) => {
+    test('submit stays disabled until every field is filled', async ({ page }) => {
         await page.goto('/login');
-        await page.getByRole('button', { name: /sign in/i }).click();
-        await expect(page).toHaveURL(/\/login/);
+        const submit = page.getByRole('button', { name: /sign in/i });
+        await expect(submit).toBeDisabled();
+
+        await page.getByPlaceholder(emailBox).fill(account.email);
+        await expect(submit).toBeDisabled();
+
+        await page.getByPlaceholder(passwordBox).fill(account.password);
+        await expect(submit).toBeDisabled();
+
+        await page.getByPlaceholder(orgCodeBox).fill(account.orgCode);
+        await expect(submit).toBeEnabled();
+    });
+
+    test('clearing a field disables submit again', async ({ page }) => {
+        await page.goto('/login');
+        await fillLogin(page, account);
+        const submit = page.getByRole('button', { name: /sign in/i });
+        await expect(submit).toBeEnabled();
+        await page.getByPlaceholder(orgCodeBox).fill('');
+        await expect(submit).toBeDisabled();
     });
 
     test('a malformed email is rejected by the field', async ({ page }) => {
