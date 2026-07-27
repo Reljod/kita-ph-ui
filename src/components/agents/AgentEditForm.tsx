@@ -55,6 +55,7 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
     const [newPersonality, setNewPersonality] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
     const [editingMemory, setEditingMemory] = useState<RagResponse | null>(null);
     const [addingMemory, setAddingMemory] = useState<RagCreateRequest | null>(null);
 
@@ -206,11 +207,19 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
         if (readOnly) return;
         e.preventDefault();
         setIsSaving(true);
+        setSaveError(null);
         try {
             await updateAgentMutation.mutateAsync({
                 ...formData,
                 personalities,
             });
+        } catch (err: unknown) {
+            // There was no catch here, so a rejected save left an unhandled
+            // promise rejection and the button simply reset — indistinguishable
+            // from a save that worked.
+            setSaveError(
+                err instanceof Error ? err.message : 'Could not save this agent.'
+            );
         } finally {
             setIsSaving(false);
         }
@@ -389,6 +398,15 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
                     )}
                 </div>
             </div>
+
+            {saveError && (
+                <div
+                    role="alert"
+                    className="mb-8 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm"
+                >
+                    {saveError}
+                </div>
+            )}
 
             {/* Tabs */}
             <div className="flex gap-8 mb-8 border-b border-slate-100">

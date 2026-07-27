@@ -3,10 +3,20 @@
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Agent, ChatItem, Message } from '@/types/agents';
+import { Agent } from '@/types/agents';
 import { ChatView, parseBackendMessages } from '@/components/chat/ChatView';
 import { Loader2 } from 'lucide-react';
 
+
+/** What /agent returns before it is mapped onto the client-side Agent. */
+type RawAgent = {
+    id: string;
+    name: string;
+    role: string;
+    avatar?: string;
+    color?: string;
+    updated_at?: string;
+};
 
 export default function AgentChatPage() {
     const params = useParams();
@@ -25,7 +35,7 @@ export default function AgentChatPage() {
     });
 
     // 2. Query chat history list for this agent
-    const { data: chats = [], isLoading: isChatsLoading } = useQuery({
+    const { data: chats = [] } = useQuery({
         queryKey: ['agent-chats', agentId],
         queryFn: async () => {
             const res = await api.get(`/agent/${agentId}/chat?preview=true`);
@@ -35,7 +45,7 @@ export default function AgentChatPage() {
     });
 
     // 3. Query messages for the active chat ID
-    const { data: messages = [], isLoading: isMessagesLoading } = useQuery({
+    const { data: messages = [] } = useQuery({
         queryKey: ['chat-messages', agentId, chatId],
         queryFn: async () => {
             if (!chatId) return [];
@@ -46,9 +56,9 @@ export default function AgentChatPage() {
         staleTime: 10000,
     });
 
-    const rawAgent = agents.find((a: any) => a.id === agentId);
+    const rawAgent = agents.find((a: RawAgent) => a.id === agentId);
 
-    const mapAgent = (a: any): Agent => ({
+    const mapAgent = (a: RawAgent): Agent => ({
         id: a.id,
         name: a.name,
         role: a.role,
@@ -57,20 +67,21 @@ export default function AgentChatPage() {
         updated_at: a.updated_at,
     });
 
-    const isPageLoading = isAgentsLoading || !rawAgent;
-
-    if (isPageLoading) {
+    // Order matters: the loading check used to also cover `!rawAgent`, which
+    // made the error branch below unreachable. A failed /agent query left the
+    // spinner up forever instead of saying so.
+    if (isAgentsError || (!isAgentsLoading && !rawAgent)) {
         return (
-            <div className="flex-1 flex items-center justify-center">
-                <Loader2 className="animate-spin text-indigo-600" size={32} />
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-500">
+                <p className="text-lg font-medium">Could not load this agent.</p>
             </div>
         );
     }
 
-    if (isAgentsError || !rawAgent) {
+    if (isAgentsLoading || !rawAgent) {
         return (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-500">
-                <p className="text-lg font-medium">Could not load this agent.</p>
+            <div className="flex-1 flex items-center justify-center">
+                <Loader2 className="animate-spin text-indigo-600" size={32} />
             </div>
         );
     }
