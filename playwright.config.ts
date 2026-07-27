@@ -3,11 +3,24 @@ import { defineConfig, devices } from '@playwright/test';
 const UI_PORT = Number(process.env.E2E_UI_PORT ?? 3000);
 const BASE_URL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${UI_PORT}`;
 
+/**
+ * A deployed API is an order of magnitude slower than a local one. Measured
+ * against FastAPI Cloud: register 6.8s, create org 11.8s, login 10.5s, and a
+ * *rejected* login 21.5s — the failure path is the slowest of the lot.
+ *
+ * The stock 15s expect timeout sits under that last figure, so every assertion
+ * about a rejected login failed on the clock rather than on the behaviour. The
+ * assertions are unchanged; only the patience is. Local runs keep the tight
+ * numbers, where a slow login really is a regression worth failing on.
+ */
+const REMOTE_API = !!process.env.E2E_API_URL;
+const scale = (local: number, factor = 3) => (REMOTE_API ? local * factor : local);
+
 export default defineConfig({
     testDir: './tests/e2e/specs',
     // Booting Mongo, Redis, the API and Next takes a while on a cold machine.
-    timeout: 90_000,
-    expect: { timeout: 15_000 },
+    timeout: scale(90_000, 2),
+    expect: { timeout: scale(15_000) },
     globalSetup: './tests/e2e/support/global-setup.ts',
     globalTeardown: './tests/e2e/support/global-teardown.ts',
     // Serial: the specs share one database and one set of seeded accounts, so
@@ -32,8 +45,8 @@ export default defineConfig({
         video: 'off',
         screenshot: 'on',
         trace: 'retain-on-failure',
-        actionTimeout: 15_000,
-        navigationTimeout: 30_000,
+        actionTimeout: scale(15_000),
+        navigationTimeout: scale(30_000, 2),
     },
     projects: [
         {

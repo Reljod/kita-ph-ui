@@ -19,6 +19,15 @@ export interface Runtime {
     notes: string[];
 }
 
+/**
+ * How long to wait for a login to land on the dashboard.
+ *
+ * Against the deployment a single /auth/login takes ~10s and the dashboard
+ * then fetches again behind it, so 30s is not enough to be waiting on
+ * behaviour rather than on the clock. Local runs keep the tight bound.
+ */
+export const LOGIN_TIMEOUT = process.env.E2E_API_URL ? 90_000 : 30_000;
+
 export function runtime(): Runtime {
     return JSON.parse(
         readFileSync(path.resolve(__dirname, '../.runtime.json'), 'utf8')

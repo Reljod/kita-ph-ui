@@ -1,5 +1,12 @@
 import { seedAccountWithOrg } from '../support/api-client';
-import { expect, newAccount, runtime, test, type Account } from '../support/fixtures';
+import {
+    LOGIN_TIMEOUT,
+    expect,
+    newAccount,
+    runtime,
+    test,
+    type Account,
+} from '../support/fixtures';
 
 /**
  * Login and route protection: the happy path plus every way the form can be
@@ -58,14 +65,14 @@ test.describe('login', () => {
         await page.goto('/login');
         await fillLogin(page, account);
         await page.getByRole('button', { name: /sign in/i }).click();
-        await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
+        await expect(page).toHaveURL(/\/dashboard/, { timeout: LOGIN_TIMEOUT });
     });
 
     test('a session cookie is set on success', async ({ page, context }) => {
         await page.goto('/login');
         await fillLogin(page, account);
         await page.getByRole('button', { name: /sign in/i }).click();
-        await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
+        await expect(page).toHaveURL(/\/dashboard/, { timeout: LOGIN_TIMEOUT });
         const cookies = await context.cookies();
         expect(cookies.find((c) => c.name === 'token')?.value).toBeTruthy();
     });
@@ -74,7 +81,7 @@ test.describe('login', () => {
         await page.goto('/login');
         await fillLogin(page, account);
         await page.getByRole('button', { name: /sign in/i }).click();
-        await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
+        await expect(page).toHaveURL(/\/dashboard/, { timeout: LOGIN_TIMEOUT });
         await page.goto('/login');
         await expect(page).toHaveURL(/\/dashboard/);
     });

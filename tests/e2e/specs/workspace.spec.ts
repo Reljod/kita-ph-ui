@@ -1,5 +1,5 @@
 import { seedAccountWithOrg } from '../support/api-client';
-import { expect, newAccount, test, type Account } from '../support/fixtures';
+import { LOGIN_TIMEOUT, expect, newAccount, test, type Account } from '../support/fixtures';
 
 /**
  * The authenticated surface: dashboard, agents, knowledge base, memory and
@@ -26,7 +26,7 @@ test.beforeEach(async ({ page }) => {
     await page.getByPlaceholder(passwordBox).fill(account.password);
     await page.getByPlaceholder(orgCodeBox).fill(account.orgCode);
     await page.getByRole('button', { name: /sign in/i }).click();
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: LOGIN_TIMEOUT });
 });
 
 test.describe('dashboard', () => {
