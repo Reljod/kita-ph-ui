@@ -76,7 +76,13 @@ export default function LoginPage() {
                 </p>
 
                 {error && (
-                    <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm flex items-start gap-2">
+                    <div
+                        // The message appears after the page has loaded, so a
+                        // screen reader has no reason to revisit it. Without a
+                        // live region the form just silently fails to submit.
+                        role="alert"
+                        className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm flex items-start gap-2"
+                    >
                         <KeyRound size={16} className="mt-0.5 shrink-0" />
                         <span>{error}</span>
                     </div>
@@ -84,8 +90,9 @@ export default function LoginPage() {
 
                 <form onSubmit={handleLogin} className="space-y-5">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5 ml-1">Email</label>
+                        <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1.5 ml-1">Email</label>
                         <input
+                            id="email"
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
@@ -96,8 +103,9 @@ export default function LoginPage() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5 ml-1">Password</label>
+                        <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1.5 ml-1">Password</label>
                         <input
+                            id="password"
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
@@ -108,8 +116,9 @@ export default function LoginPage() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5 ml-1">Organization Code</label>
+                        <label htmlFor="org-code" className="block text-sm font-medium text-slate-700 mb-1.5 ml-1">Organization Code</label>
                         <input
+                            id="org-code"
                             type="text"
                             value={orgCode}
                             onChange={(e) => setOrgCode(e.target.value)}

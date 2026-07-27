@@ -1,0 +1,129 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit:
+    name: Unit tests + coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: the lint step diffs against the base branch.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint the changed files
+        # `npm run lint` is unscoped and this tree already carries 20 eslint
+        # errors on main, so a repo-wide sweep fails every PR regardless of
+        # what it touched. Same reasoning as the pre-commit gate.
+        run: |
+          base="${{ github.base_ref || 'main' }}"
+          git fetch --no-tags origin "$base"
+          files=$(git diff --name-only --diff-filter=ACM "origin/$base...HEAD" \
+            -- '*.js' '*.jsx' '*.mjs' '*.ts' '*.tsx')
+          if [ -n "$files" ]; then npx eslint $files; fi
+      - name: Vitest with coverage thresholds
+        # vitest.config.ts fails the run below 90% lines/functions/branches/statements.
+        run: npm run test:cov
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-coverage
+          path: coverage/
+          retention-days: 14
+
+  e2e:
+    name: End-to-end
+    runs-on: ubuntu-latest
+    # workers: 1 and a CI retry mean the theoretical worst case is well over an
+    # hour, and GitHub's default would let it sit for six. A run that overruns
+    # this is stuck on the deployment, not slow.
+    timeout-minutes: 30
+    # Runs against the deployed API rather than standing a stack up here. The
+    # old shape checked out the API, installed uv, and ran mongo/redis service
+    # containers just to reach a server this job never asserted anything about
+    # — and it could only ever exercise a build of the API's *default* branch.
+    # Pointing at the deployment tests what is actually running.
+    env:
+      E2E_API_URL: ${{ vars.E2E_API_URL || 'https://kita-api-dev.fastapicloud.dev' }}
+      # Sourced from the Doppler-synced repository secrets so this config has a
+      # single origin, with the deployment URL as a fallback for a fork or a
+      # repo that has not been synced.
+      #
+      # NEXT_PUBLIC_* is inlined into the client bundle at build time, so it has
+      # to be set on the step that builds — globalSetup putting it in the
+      # `next start` environment is far too late. Without it the browser falls
+      # back to http://localhost:8000, where nothing is listening, and every
+      # spec that logs in dies on a timeout while unauthenticated ones pass.
+      # Job-level so the build step and the run step cannot disagree.
+      NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || '/api' }}
+      NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL || vars.E2E_API_URL || 'https://kita-api-dev.fastapicloud.dev' }}
+      # The server-side proxy target. globalSetup also injects this when it
+      # starts Next itself, but it reuses an already-listening :3000 as-is —
+      # so setting it here keeps the two paths agreeing.
+      KITA_BACKEND_URL: ${{ secrets.KITA_BACKEND_URL || vars.E2E_API_URL || 'https://kita-api-dev.fastapicloud.dev' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Check the API credentials are configured
+        id: creds
+        # A missing secret is a repository-configuration gap, not a defect in
+        # the diff. Say exactly what to add and stop, rather than failing a
+        # required check that no code change could ever turn green.
+        env:
+          # Either pair works — they are the same credential. E2E_* wins so a
+          # dedicated test client can be swapped in without touching the app's.
+          API_KEY: ${{ secrets.E2E_API_KEY || secrets.KITA_API_KEY }}
+        run: |
+          if [ -z "$API_KEY" ]; then
+            echo "::warning title=E2E skipped::Set E2E_API_KEY/E2E_CLIENT_ID (or sync KITA_API_KEY/KITA_CLIENT_ID from Doppler) to run the E2E suite. The value is a client registered in kita_admin.clients."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A Doppler config pointed at a developer's machine would rebuild the
+          # localhost failure this job exists to catch, and the symptom is a
+          # 30s timeout with nothing in the log. Refuse it up front instead.
+          case "$NEXT_PUBLIC_BACKEND_URL$KITA_BACKEND_URL" in
+            *localhost*|*127.0.0.1*)
+              echo "::error title=E2E misconfigured::NEXT_PUBLIC_BACKEND_URL / KITA_BACKEND_URL point at localhost, but this job runs against a deployment. Update the Doppler config these secrets sync from."
+              exit 1
+              ;;
+          esac
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Install UI dependencies
+        if: steps.creds.outputs.ready == 'true'
+        run: npm ci
+      - name: Install the Playwright browser
+        if: steps.creds.outputs.ready == 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Build the UI once
+        if: steps.creds.outputs.ready == 'true'
+        run: npm run build
+      - name: Run the E2E suite
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          E2E_API_KEY: ${{ secrets.E2E_API_KEY || secrets.KITA_API_KEY }}
+          E2E_CLIENT_ID: ${{ secrets.E2E_CLIENT_ID || secrets.KITA_CLIENT_ID }}
+          E2E_SKIP_BUILD: '1'
+        run: npm run test:e2e
+      - name: Upload the run evidence
+        uses: actions/upload-artifact@v4
+        if: always() && steps.creds.outputs.ready == 'true'
+        with:
+          # A screenshot from every spec, plus the HTML report, traces for any
+          # failure, and the UI server log. Uploaded rather than committed.
+          # Video capture is off (see playwright.config.ts), so nothing here
+          # is a .webm.
+          name: e2e-evidence
+          path: tests/e2e/artifacts/
+          retention-days: 30

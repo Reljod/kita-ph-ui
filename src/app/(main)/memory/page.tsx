@@ -10,13 +10,16 @@ import { Agent } from '@/types/agents';
 import { RagResponse, RagCreateRequest, RagUpdateRequest } from '@/types/memory';
 import { Plus, Search, User, Globe, Loader2, BrainCircuit, List, LayoutGrid } from 'lucide-react';
 import { MemoryTable } from '@/components/memory/MemoryTable';
-import { useEffect } from 'react';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 export default function MemoryVaultPage() {
     const queryClient = useQueryClient();
     const [scope, setScope] = useState<'agent' | 'org'>('org');
-    const [selectedAgentId, setSelectedAgentId] = useState<string>('');
+    // The picker's value is only ever "whatever the user chose, else the
+    // first agent". Storing that in an effect meant a cascading render on
+    // every load and a re-keyed query; deriving it is the same value with
+    // neither.
+    const [pickedAgentId, setPickedAgentId] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingMemory, setEditingMemory] = useState<RagResponse | null>(null);
@@ -39,16 +42,16 @@ export default function MemoryVaultPage() {
         },
     });
 
-    // Handle initial agent selection
-    useEffect(() => {
-        if (agents.length > 0 && !selectedAgentId) {
-            setSelectedAgentId(agents[0].id);
-        }
-    }, [agents, selectedAgentId]);
+    const selectedAgentId = pickedAgentId || agents[0]?.id || '';
 
     // Fetch Memories
     const { data: memories = [], isLoading } = useQuery<RagResponse[]>({
-        queryKey: ['memories', scope, selectedAgentId],
+        // Keyed on the agent only when the request actually carries one. With
+        // selectedAgentId in the key unconditionally, the agent list landing
+        // re-keys an org-wide query whose result does not depend on it — the
+        // list you are reading is thrown away for a spinner and an identical
+        // refetch.
+        queryKey: ['memories', scope, scope === 'agent' ? selectedAgentId : null],
         queryFn: () => memoryService.getAll(scope === 'agent' ? selectedAgentId : undefined),
         enabled: scope === 'org' || !!selectedAgentId,
     });
@@ -179,7 +182,7 @@ export default function MemoryVaultPage() {
                             <div className="relative group">
                                 <select
                                     value={selectedAgentId}
-                                    onChange={(e) => setSelectedAgentId(e.target.value)}
+                                    onChange={(e) => setPickedAgentId(e.target.value)}
                                     className="appearance-none pl-4 pr-10 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer shadow-sm min-w-[200px]"
                                 >
                                     {agents.map(a => (
