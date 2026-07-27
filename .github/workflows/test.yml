@@ -61,6 +61,10 @@ jobs:
       # Job-level so the build step and the run step cannot disagree.
       NEXT_PUBLIC_API_URL: /api
       NEXT_PUBLIC_BACKEND_URL: ${{ vars.E2E_API_URL || 'https://kita-api-dev.fastapicloud.dev' }}
+      # The server-side proxy target. globalSetup also injects this when it
+      # starts Next itself, but it reuses an already-listening :3000 as-is —
+      # so setting it here keeps the two paths agreeing.
+      KITA_BACKEND_URL: ${{ vars.E2E_API_URL || 'https://kita-api-dev.fastapicloud.dev' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
