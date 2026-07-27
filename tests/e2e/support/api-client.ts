@@ -10,7 +10,11 @@
 import { runtime } from './fixtures';
 
 function baseUrl(): string {
-    return `http://127.0.0.1:${runtime().apiPort}`;
+    // globalSetup records where the API actually is; it may be a deployment
+    // rather than the local process. apiPort is the fallback for runtime files
+    // written before backendUrl existed.
+    const { backendUrl, apiPort } = runtime();
+    return backendUrl ?? `http://127.0.0.1:${apiPort}`;
 }
 
 function headers(extra: Record<string, string> = {}): Record<string, string> {

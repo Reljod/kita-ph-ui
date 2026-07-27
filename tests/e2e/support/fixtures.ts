@@ -5,9 +5,13 @@ import { test as base, expect, type Page } from '@playwright/test';
 
 export interface Runtime {
     mongoUri: string;
-    mongoSource: 'cloud' | 'local';
-    redisSource: 'cloud' | 'local';
+    mongoSource: 'cloud' | 'local' | 'remote';
+    redisSource: 'cloud' | 'local' | 'remote';
     dbName: string;
+    /** Where the API actually is — a deployment URL, or the local process. */
+    backendUrl?: string;
+    /** False when the API is deployed: nothing here owns its database. */
+    provisionedDb?: boolean;
     apiPort: number;
     clientId: string;
     apiKey: string;
