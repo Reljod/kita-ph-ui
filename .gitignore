@@ -41,3 +41,8 @@ yarn-error.log*
 next-env.d.ts
 
 *.code-workspace
+# E2E run artifacts (videos, screenshots, traces, reports) — uploaded as CI
+# artifacts, never committed.
+/tests/e2e/artifacts/
+/tests/e2e/.runtime.json
+/coverage/
