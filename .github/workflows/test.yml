@@ -53,6 +53,14 @@ jobs:
     # Pointing at the deployment tests what is actually running.
     env:
       E2E_API_URL: ${{ vars.E2E_API_URL || 'https://kita-api-dev.fastapicloud.dev' }}
+      # NEXT_PUBLIC_* is inlined into the client bundle at build time, so it has
+      # to be set on the step that builds — globalSetup putting it in the
+      # `next start` environment is far too late. Without it the browser falls
+      # back to http://localhost:8000, where nothing is listening, and every
+      # spec that logs in dies on a timeout while unauthenticated ones pass.
+      # Job-level so the build step and the run step cannot disagree.
+      NEXT_PUBLIC_API_URL: /api
+      NEXT_PUBLIC_BACKEND_URL: ${{ vars.E2E_API_URL || 'https://kita-api-dev.fastapicloud.dev' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

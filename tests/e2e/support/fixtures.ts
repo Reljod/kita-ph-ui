@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { test as base, expect, type Page } from '@playwright/test';
+import { test as base, expect } from '@playwright/test';
 
 export interface Runtime {
     mongoUri: string;
@@ -40,20 +40,9 @@ export function newAccount(label: string) {
 
 export type Account = ReturnType<typeof newAccount>;
 
-/**
- * Register through the UI. The login page carries both flows, so this drives
- * whichever affordance the page exposes rather than hitting the API directly —
- * the point of an E2E is that the real form works.
- */
-export async function registerThroughUi(page: Page, account: Account): Promise<void> {
-    await page.goto('/login');
-    await page.getByRole('button', { name: /sign up|register|create account/i }).first().click();
-    await page.getByLabel(/first name/i).fill(account.firstName);
-    await page.getByLabel(/last name/i).fill(account.lastName);
-    await page.getByLabel(/email/i).fill(account.email);
-    await page.getByLabel(/^password/i).fill(account.password);
-    await page.getByRole('button', { name: /sign up|register|create account/i }).last().click();
-}
+// Accounts are registered through the API (see support/api-client.ts), not
+// through the page: the login route only logs in, there is no signup form to
+// drive. A UI helper for it existed here and was never called by any spec.
 
 export const test = base.extend<{ account: Account }>({
     // The second argument is Playwright's fixture callback. It is passed

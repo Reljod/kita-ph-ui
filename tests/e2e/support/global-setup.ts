@@ -16,7 +16,7 @@
  */
 
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, openSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { startMockOpenRouter } from './mock-openrouter';
@@ -101,6 +101,35 @@ function remoteCredentials(apiEnv: NodeJS.ProcessEnv): {
 
     log("no credentials supplied — minting one against the API's Mongo");
     return registerApiClient(apiEnv);
+}
+
+/**
+ * Reject a reused build that has no API URL baked into it.
+ *
+ * NEXT_PUBLIC_* is inlined at build time, so a `next build` run without
+ * NEXT_PUBLIC_API_URL leaves the `http://localhost:8000` fallback from
+ * src/lib/api.ts in the client bundle. Nothing listens there, so every spec
+ * that logs in dies on a 30s timeout while the unauthenticated ones pass —
+ * and the UI server log says nothing, because the requests never reach it.
+ *
+ * Checking the artifact rather than the environment is deliberate: a local
+ * build picks these up from .env.local, which this process never reads, so an
+ * env check would fail a run whose bundle is perfectly fine.
+ */
+function assertBundleHasApiUrl(): void {
+    const chunks = path.resolve(REPO_ROOT, '.next/static/chunks');
+    if (!existsSync(chunks)) return; // no build to inspect; next start will say so
+    const offender = readdirSync(chunks).find(
+        (f) => f.endsWith('.js') && readFileSync(path.join(chunks, f), 'utf8').includes('http://localhost:8000')
+    );
+    if (offender) {
+        throw new Error(
+            'The reused build has no NEXT_PUBLIC_API_URL baked in, so the browser ' +
+                'would call http://localhost:8000 and every login would time out. ' +
+                'Set NEXT_PUBLIC_API_URL=/api (and NEXT_PUBLIC_BACKEND_URL) on the ' +
+                'step that runs `next build`, or unset E2E_SKIP_BUILD to rebuild here.'
+        );
+    }
 }
 
 export default async function globalSetup(): Promise<void> {
@@ -214,6 +243,9 @@ export default async function globalSetup(): Promise<void> {
     if (await canConnect('127.0.0.1', UI_PORT, 1000)) {
         log(`something is already listening on :${UI_PORT}; reusing it`);
     } else {
+        if (process.env.E2E_SKIP_BUILD === '1') {
+            assertBundleHasApiUrl();
+        }
         if (process.env.E2E_SKIP_BUILD !== '1') {
             log('building the Next app (set E2E_SKIP_BUILD=1 to reuse an existing build)');
             const build = spawnSync('npm', ['run', 'build'], {
