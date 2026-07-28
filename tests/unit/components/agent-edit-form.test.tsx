@@ -259,6 +259,71 @@ describe('AgentEditForm', () => {
         });
     });
 
+    describe('language', () => {
+        it('defaults to English for an agent that predates the setting', async () => {
+            // Nothing migrates the stored agents, so most of them arrive with
+            // no language at all. Rendering an empty select would look like
+            // the setting had been cleared.
+            await renderForm();
+            expect(screen.getByLabelText(/speaks in/i)).toHaveValue('english');
+        });
+
+        it('selects the configured language', async () => {
+            respond({ agent: { ...AGENT, language: 'filipino' } });
+            await renderForm();
+            expect(screen.getByLabelText(/speaks in/i)).toHaveValue('filipino');
+        });
+
+        it('offers Filipino', async () => {
+            await renderForm();
+            expect(
+                screen.getByRole('option', { name: /filipino \(taglish\)/i })
+            ).toBeInTheDocument();
+        });
+
+        it('sends a language change', async () => {
+            await renderForm();
+            fireEvent.change(screen.getByLabelText(/speaks in/i), {
+                target: { value: 'filipino' },
+            });
+            fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+            await waitFor(() =>
+                expect(apiPut).toHaveBeenCalledWith(
+                    '/agent/agent_1',
+                    expect.objectContaining({ language: 'filipino' })
+                )
+            );
+        });
+
+        it('sends the language along with an unrelated edit', async () => {
+            // The form PUTs the whole of formData, so a field it forgets to
+            // carry would blank the agent's language on any other save.
+            respond({ agent: { ...AGENT, language: 'filipino' } });
+            await renderForm();
+            fireEvent.change(screen.getByLabelText(/agent name/i), {
+                target: { value: 'Scribe v2' },
+            });
+            fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+            await waitFor(() =>
+                expect(apiPut).toHaveBeenCalledWith(
+                    '/agent/agent_1',
+                    expect.objectContaining({ language: 'filipino' })
+                )
+            );
+        });
+
+        it('explains what Filipino does', async () => {
+            respond({ agent: { ...AGENT, language: 'filipino' } });
+            await renderForm();
+            expect(screen.getByText(/natural na Taglish/i)).toBeInTheDocument();
+        });
+
+        it('cannot be changed in the read-only view', async () => {
+            await renderForm({ readOnly: true });
+            expect(screen.getByLabelText(/speaks in/i)).toBeDisabled();
+        });
+    });
+
     describe('personality traits', () => {
         it('lists the current traits', async () => {
             await renderForm();
