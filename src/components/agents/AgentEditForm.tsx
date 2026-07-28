@@ -4,7 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Agent } from '@/types/agents';
+import {
+    AGENT_LANGUAGE_LABELS,
+    AGENT_LANGUAGES,
+    Agent,
+    AgentLanguage,
+} from '@/types/agents';
 import { RagResponse, RagCreateRequest, RagUpdateRequest } from '@/types/memory';
 import {
     Save,
@@ -22,10 +27,9 @@ import {
     CheckCircle2,
     Hammer,
     Wrench,
-    Globe,
-    Database,
     Zap,
-    ArrowRight
+    ArrowRight,
+    Languages
 } from 'lucide-react';
 import { Tool } from '@/types/tools';
 import {
@@ -105,12 +109,20 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
     });
 
     // Form State
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<{
+        name: string;
+        role: string;
+        goal: string;
+        backstory: string;
+        llm_id: string;
+        language: AgentLanguage;
+    }>({
         name: '',
         role: '',
         goal: '',
         backstory: '',
         llm_id: '',
+        language: 'english',
     });
 
     // Combined Memories - De-duplicate by ID just in case
@@ -129,6 +141,9 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
                 goal: agent.goal || '',
                 backstory: agent.backstory || '',
                 llm_id: agent.llm_id || '',
+                // An agent created before this setting existed comes back
+                // without the field; English is what it already spoke.
+                language: agent.language || 'english',
             });
             setPersonalities(agent.personalities || []);
         }
@@ -491,6 +506,32 @@ export function AgentEditForm({ agentId, readOnly = false }: Props) {
                                     </option>
                                 ))}
                             </select>
+                        </div>
+
+                        <div>
+                            <div className="flex items-center gap-2 text-indigo-600 mt-8 mb-4">
+                                <Languages size={18} />
+                                <h2 className="font-bold uppercase tracking-wider text-xs">Language</h2>
+                            </div>
+                            <label htmlFor="agent-language" className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Speaks In</label>
+                            <select
+                                id="agent-language"
+                                value={formData.language}
+                                onChange={(e) => setFormData({ ...formData, language: e.target.value as AgentLanguage })}
+                                disabled={readOnly}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-xl outline-none transition-all text-slate-800 appearance-none disabled:opacity-70"
+                            >
+                                {AGENT_LANGUAGES.map((language) => (
+                                    <option key={language} value={language}>
+                                        {AGENT_LANGUAGE_LABELS[language]}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-slate-400 mt-2 ml-1 leading-relaxed">
+                                {formData.language === 'filipino'
+                                    ? 'Sasagot ang agent sa natural na Taglish sa bawat mensahe, kahit English ang isulat sa kanya.'
+                                    : 'The agent replies in English.'}
+                            </p>
                         </div>
                     </div>
 
