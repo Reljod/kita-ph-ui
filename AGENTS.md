@@ -50,6 +50,12 @@ don't narrate it.
 - **This sandbox has HTTPS egress only.** Mongo Atlas `:27017` is
   unreachable here while `:443` works, so a Mongo timeout is the network,
   not the credentials.
+- **A local lint gate has to match CI's scope, not just its command.**
+  `pre-commit` sees only staged files; CI lints everything the branch
+  touches relative to `main`. A file already clean when it was staged still
+  fails CI, which is how a green local commit produced a red PR. `pre-push`
+  runs the same commands over the same branch-wide diff.
+  → **`setup-git-hooks`**
 - _Add your project's WHYs here as they emerge._
 
 ## How code quality is enforced (the layer model)
