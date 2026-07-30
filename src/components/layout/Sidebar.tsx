@@ -2,15 +2,26 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Bot, X, BrainCircuit, Hammer, BookOpen } from 'lucide-react';
+import {
+    LayoutDashboard,
+    Bot,
+    X,
+    BrainCircuit,
+    Hammer,
+    BookOpen,
+    MessagesSquare,
+    Plug,
+} from 'lucide-react';
 import { useSidebarStore } from '@/store/useSidebarStore';
 
 const navLinks = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/agents', label: 'Agents', icon: Bot },
+    { href: '/inbox', label: 'Inbox', icon: MessagesSquare },
     { href: '/memory', label: 'Memory Vault', icon: BrainCircuit },
     { href: '/knowledge-base', label: 'Knowledge Base', icon: BookOpen },
     { href: '/tools', label: 'Tools', icon: Hammer },
+    { href: '/integrations', label: 'Integrations', icon: Plug },
 ];
 
 export function Sidebar() {
